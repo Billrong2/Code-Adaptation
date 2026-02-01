@@ -1,0 +1,46 @@
+
+
+package com.irccloud.android;
+
+import java.text.Collator;
+import java.util.Comparator;
+
+public class AlphanumComparator implements Comparator<CharSequence> {
+
+    
+    private final Collator collator;
+
+    
+    public AlphanumComparator() {
+        this(Collator.getInstance());
+    }
+
+    
+    public AlphanumComparator(final Collator collator) {
+        if (collator == null)
+            throw new IllegalArgumentException("collator must not be null");
+        this.collator = collator;
+    }
+
+    
+    private static boolean isDigit(final int character) {
+        
+        return character >= 48 && character <= 57;
+    }
+
+    
+    private static CharSequence getChunk(final CharSequence charSeq, final int start) {
+        int index = start;
+        final int length = charSeq.length();
+        final boolean mode = isDigit(charSeq.charAt(index++));
+        while (index < length) {
+            if (isDigit(charSeq.charAt(index)) != mode)
+                break;
+            ++index;
+        }
+        return charSeq.subSequence(start, index);
+    }
+
+        // TODO
+
+}

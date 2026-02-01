@@ -1,0 +1,33 @@
+package fr.neraud.padlistener.helper;
+
+import android.content.Context;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
+import android.net.wifi.WifiManager;
+
+import java.math.BigInteger;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.nio.ByteOrder;
+
+import fr.neraud.log.MyLog;
+
+
+public class WifiHelper {
+
+	private final Context context;
+
+	public WifiHelper(Context context) {
+		this.context = context;
+	}
+
+	
+	public boolean isWifiConnected() {
+		final ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+		final NetworkInfo wifiNetwork = cm.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
+		return (wifiNetwork != null && wifiNetwork.isConnected());
+	}
+
+		// TODO
+
+}

@@ -1,0 +1,66 @@
+package com.opendoorlogistics.codefromweb;
+
+import java.awt.Component;
+import java.awt.Graphics;
+import java.awt.Image;
+import java.awt.Point;
+import java.awt.Rectangle;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseMotionAdapter;
+import java.awt.image.BufferedImage;
+
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JTabbedPane;
+import javax.swing.UIManager;
+import javax.swing.UIManager.LookAndFeelInfo;
+
+
+public class DraggableTabbedPane extends JTabbedPane {
+
+  private boolean dragging = false;
+  private Image tabImage = null;
+  private Point currentMouseLocation = null;
+  private int draggedTabIndex = 0;
+
+  // TODO
+
+
+  protected void paintComponent(Graphics g) {
+    super.paintComponent(g);
+
+    
+    if(dragging && currentMouseLocation != null && tabImage != null) {
+      
+      g.drawImage(tabImage, currentMouseLocation.x, currentMouseLocation.y, this);
+    }
+  }
+
+  public static void main(String[] args) {
+		for (LookAndFeelInfo info : UIManager.getInstalledLookAndFeels()) {
+			if ("Nimbus".equals(info.getName())) {
+				try {
+					UIManager.setLookAndFeel(info.getClassName());					
+				} catch (Throwable e) {
+					
+				}
+				break;
+			}
+		}
+
+		
+    JFrame test = new JFrame("Tab test");
+    test.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+    test.setSize(400, 400);
+
+    DraggableTabbedPane tabs = new DraggableTabbedPane();
+    tabs.addTab("One", new JButton("One"));
+    tabs.addTab("Two", new JButton("Two"));
+    tabs.addTab("Three", new JButton("Three"));
+    tabs.addTab("Four", new JButton("Four"));
+
+    test.add(tabs);
+    test.setVisible(true);
+  }
+}

@@ -1,0 +1,19 @@
+package com.firebasedemo.stackoverflow;
+
+import android.support.v7.app.AppCompatActivity;
+import android.os.Bundle;
+import android.view.View;
+import android.widget.ListView;
+import android.widget.TextView;
+
+import com.firebase.client.DataSnapshot;
+import com.firebase.client.Firebase;
+import com.firebase.client.Query;
+import com.firebase.ui.FirebaseListAdapter;
+
+
+public class Activity36160819 extends AppCompatActivity {
+
+    // TODO
+
+}

@@ -1,0 +1,675 @@
+
+package at.alladin.rmbt.controlServer;
+
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Types;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+import org.restlet.data.Status;
+import org.restlet.resource.Get;
+
+import at.alladin.rmbt.shared.Classification;
+import at.alladin.rmbt.shared.model.SpeedItems;
+import at.alladin.rmbt.shared.model.SpeedItems.SpeedItem;
+
+import com.google.gson.Gson;
+
+
+public class OpenTestResource extends ServerResource
+{
+    
+    public final int MAXROWS = 400;
+    
+    
+    private final String[] openDataFieldsFull = {
+    		"open_uuid", 
+    		"open_test_uuid", 
+    		"time", 
+    		"cat_technology",  
+    		"network_type", 
+    		"lat", 
+    		"long", 
+    		"loc_src", 
+    		"loc_accuracy",
+    		"public_ip_as_name",
+            "zip_code", 
+            "download_kbit", 
+            "upload_kbit", 
+            "wifi_link_speed", 
+            "ping_ms", 
+            "signal_strength", 
+            "lte_rsrp", 
+            "lte_rsrq",
+            "server_name", 
+            "implausible", 
+            "test_duration", 
+            "num_threads_requested",
+            "num_threads", 
+            "num_threads_ul",
+            "platform", 
+            "model", 
+            "model_native",
+            "product",     
+            "client_version",  
+            "network_mcc_mnc", 
+            "network_country",    
+            "roaming_type",
+            "network_name", 
+            "sim_mcc_mnc", 
+            "sim_country",           
+            "provider_name",
+            "connection", 
+            "asn", 
+            "ip_anonym", 
+            "ndt_download_kbit", 
+            "ndt_upload_kbit", 
+            "country_geoip",
+            "country_location",
+            "country_asn",
+            "bytes_download",
+            "bytes_upload",
+            "test_if_bytes_download",
+            "test_if_bytes_upload",
+            "testdl_if_bytes_download",
+            "testdl_if_bytes_upload",
+            "testul_if_bytes_download",
+            "testul_if_bytes_upload",
+            "duration_download_ms",
+            "duration_upload_ms",
+            "time_dl_ms",
+            "time_ul_ms"
+    };
+    
+    
+    
+    private final HashSet<String> openDataNumberFields = new HashSet<>(Arrays.asList(new String[]{"time", "lat", "long", "loc_accuracy", "zip_code", "download_kbit",
+        "upload_kbit","ping_ms","signal_strength","lte_rsrp","lte_rsrq","test_duration","num_threads","ndt_download_kbit","ndt_upload_kbit","asn",
+        "bytes_download","bytes_upload","test_if_bytes_download","test_if_bytes_upload","testdl_if_bytes_download",
+        "testdl_if_bytes_upload","testul_if_bytes_download","testul_if_bytes_upload","duration_download_ms","duration_upload_ms","time_dl_ms",
+        "time_ul_ms", "roaming_type", "num_threads_ul", "num_threads_requested"
+        }));
+    
+    
+    private final HashSet<String> openDataBooleanFields = new HashSet<>(Arrays.asList(new String[] {"implausible"}));
+    
+    @Get("json")
+    public String request(final String entity)
+    {
+        addAllowOrigin();
+
+        
+        String openUUID = getRequest().getAttributes().get("open_test_uuid").toString();
+        return getSingleOpenTest(openUUID);
+        
+    }
+    
+    
+    
+    private String getSingleOpenTest(String openTestUUID) {       
+        final String sql = "SELECT t.uid as test_uid, " +
+                " ('P' || t.open_uuid) open_uuid," +  
+                " ('O' || t.open_test_uuid) open_test_uuid," + 
+                " to_char(t.time AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') \"time\"," +
+                " t.time full_time," + 
+                " t.client_time client_time," +  
+                " t.network_group_name cat_technology," + 
+                " t.network_group_type network_type," + 
+                
+                
+                " (CASE WHEN (t.geo_accuracy < ?) AND (t.geo_provider != 'manual') AND (t.geo_provider != 'geocoder') THEN" +
+                " t.geo_lat" +
+                " WHEN (t.geo_accuracy < ?) THEN" +
+                " ROUND(t.geo_lat*1111)/1111" + 
+                " ELSE null" +
+                " END) lat," +
+                
+                " (CASE WHEN (t.geo_accuracy < ?) AND (t.geo_provider != 'manual') AND (t.geo_provider != 'geocoder') THEN" +
+                " t.geo_long" +
+                " WHEN (t.geo_accuracy < ?) THEN" +
+                " ROUND(t.geo_long*741)/741 " + 
+                " ELSE null" +
+                " END) long," +
+                
+                " (CASE WHEN ((t.geo_provider = 'manual') OR (t.geo_provider = 'geocoder')) THEN" +
+                " 'rastered'" + 
+                " ELSE t.geo_provider" +
+                " END) loc_src," +
+                
+                " (CASE WHEN (t.geo_accuracy < ?) AND (t.geo_provider != 'manual') AND (t.geo_provider != 'geocoder') " +
+                " THEN t.geo_accuracy " +
+                " WHEN (t.geo_accuracy < 100) AND ((t.geo_provider = 'manual') OR (t.geo_provider = 'geocoder')) THEN 100" + 
+                " WHEN (t.geo_accuracy < ?) THEN t.geo_accuracy" +
+                " ELSE null END) loc_accuracy, " +
+                
+                " (CASE WHEN (t.zip_code < 1000 OR t.zip_code > 9999) THEN null ELSE t.zip_code END) zip_code," +
+                
+                " t.speed_download download_kbit," + 
+                " t.speed_upload upload_kbit," + 
+                " t.wifi_link_speed," + 
+                " (t.ping_median::float / 1000000) ping_ms," + 
+                " signal_strength," + 
+                " lte_rsrp," + 
+                " lte_rsrq," + 
+                " ts.name server_name," + 
+                " implausible, " +  
+                " public_ip_as_name, " + 
+                " duration test_duration," +  
+                " num_threads_requested," + 
+                " num_threads," + 
+                " num_threads_ul," + 
+                " COALESCE(t.plattform, t.client_name) as platform," + 
+                " COALESCE(adm.fullname, t.model) model," + 
+                " t.model model_native," + 
+                " t.product product," +  
+                " t.client_software_version client_version," + 
+                " t.network_operator network_mcc_mnc," + 
+                " network_country," + 
+                
+                " roaming_type," + 
+                " t.network_operator_name network_name," + 
+                " t.network_sim_operator sim_mcc_mnc," + 
+                " t.network_sim_country sim_country," + 
+                " COALESCE(mprov.name,msim.shortname,msim.name,prov.name) provider_name," +  
+                " t.nat_type \"connection\"," + 
+                " t.public_ip_asn asn," + 
+                " t.client_public_ip_anonymized ip_anonym," +  
+                " (ndt.s2cspd*1000)::int ndt_download_kbit," + 
+                " (ndt.c2sspd*1000)::int ndt_upload_kbit," + 
+                " country_geoip," + 
+                " country_location," + 
+                " country_asn," + 
+                " bytes_download," + 
+                " bytes_upload," + 
+                " test_if_bytes_download," + 
+                " test_if_bytes_upload," + 
+                " testdl_if_bytes_download," + 
+                " testdl_if_bytes_upload," + 
+                " testul_if_bytes_download," + 
+                " testul_if_bytes_upload," + 
+                " (t.nsec_download::float / 1000000) duration_download_ms," + 
+                " (t.nsec_upload::float / 1000000) duration_upload_ms," + 
+                " (t.time_dl_ns::float / 1000000) time_dl_ms," + 
+                " (t.time_ul_ns::float / 1000000) time_ul_ms," + 
+                
+                " speed.items speed_items" + 
+
+                " FROM test t" +
+                " LEFT JOIN device_map adm ON adm.codename=t.model" +
+                " LEFT JOIN test_server ts ON ts.uid=t.server_id" +
+                " LEFT JOIN test_ndt ndt ON t.uid=ndt.test_id" +
+                " LEFT JOIN provider prov ON t.provider_id=prov.uid" +
+                " LEFT JOIN provider mprov ON t.mobile_provider_id=mprov.uid" +
+                " LEFT JOIN mccmnc2name msim ON t.mobile_sim_id=msim.uid" +
+                " LEFT JOIN speed ON speed.open_test_uuid=t.open_test_uuid" +
+                " WHERE " +
+                " t.deleted = false " +
+                " AND t.status = 'FINISHED' " +
+                " AND t.open_test_uuid = ? ";
+        
+
+        
+        
+        
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        final JSONObject response = new JSONObject();
+        try
+        {
+            ps = conn.prepareStatement(sql);
+            
+            
+            double accuracy = Double.parseDouble(settings.getString("RMBT_GEO_ACCURACY_DETAIL_LIMIT"));
+            ps.setDouble(1, accuracy);
+            ps.setDouble(2, accuracy);
+            ps.setDouble(3, accuracy);
+            ps.setDouble(4, accuracy);
+            ps.setDouble(5, accuracy);
+            ps.setDouble(6, accuracy);
+
+            
+            
+            if (openTestUUID != null && openTestUUID.startsWith("O")) {
+                openTestUUID = openTestUUID.substring(1);
+            }
+            ps.setObject(7, openTestUUID,Types.OTHER);
+            
+            if (!ps.execute())
+                return null;
+            rs = ps.getResultSet();
+            
+            
+            if (rs.next())
+            {
+                
+                for (int i=0;i<openDataFieldsFull.length;i++) {
+                    
+                    
+                    final Object obj = rs.getObject(openDataFieldsFull[i]);
+                    if (openDataBooleanFields.contains(openDataFieldsFull[i])) {
+                    	if (obj == null) {
+                    		response.put(openDataFieldsFull[i], false);
+                    	} 
+                    	else {
+                    		response.put(openDataFieldsFull[i], obj);
+                    	}
+                    }
+                    else if (obj==null) {
+                        response.put(openDataFieldsFull[i], JSONObject.NULL);
+                    } 
+                    else if (openDataNumberFields.contains(openDataFieldsFull[i])) {
+                    	final String tmp = obj.toString().trim();
+                    	if (tmp.isEmpty()) 
+                    		response.put(openDataFieldsFull[i], JSONObject.NULL);
+                    	else
+                    		response.put(openDataFieldsFull[i], JSONObject.stringToValue(tmp));
+                    }  
+                    else {
+                    	final String tmp = obj.toString().trim();
+						if (tmp.isEmpty())
+							response.put(openDataFieldsFull[i], JSONObject.NULL);
+						else
+							response.put(openDataFieldsFull[i], tmp);
+                    }
+                    
+                }
+                
+                
+                
+                response.put("download_classification", Classification.classify(Classification.THRESHOLD_DOWNLOAD, rs.getLong("download_kbit"), capabilities.getClassificationCapability().getCount()));
+                response.put("upload_classification", Classification.classify(Classification.THRESHOLD_UPLOAD, rs.getLong("upload_kbit"), capabilities.getClassificationCapability().getCount()));
+                response.put("ping_classification", Classification.classify(Classification.THRESHOLD_PING, rs.getLong("ping_ms")*1000000, capabilities.getClassificationCapability().getCount()));
+                
+				if ((rs.getString("signal_strength") != null || rs
+						.getString("lte_rsrp") != null)
+						&& rs.getString("network_type") != null) { 
+					if (rs.getString("lte_rsrp") == null) { 
+						if (rs.getString("network_type").equals("WLAN")) { 
+							response.put(
+									"signal_classification",
+									Classification
+											.classify(
+													Classification.THRESHOLD_SIGNAL_WIFI,
+													rs.getLong("signal_strength"),capabilities.getClassificationCapability().getCount()));
+						} else { 
+							response.put(
+									"signal_classification",
+									Classification
+											.classify(
+													Classification.THRESHOLD_SIGNAL_MOBILE,
+													rs.getLong("signal_strength"),capabilities.getClassificationCapability().getCount()));
+						}
+					} else 
+						response.put("signal_classification", Classification
+								.classify(Classification.THRESHOLD_SIGNAL_RSRP,
+										rs.getLong("lte_rsrp"), capabilities.getClassificationCapability().getCount()));
+				} else { 
+					response.put("signal_classification", JSONObject.NULL);
+				}
+                
+                
+                
+                JSONObject speedCurve = new JSONObject();
+                JSONArray downloadSpeeds = new JSONArray();
+                JSONArray uploadSpeeds = new JSONArray();
+                JSONArray locArray = new JSONArray();
+                JSONArray signalArray = new JSONArray();
+                
+                
+                
+                
+                final Gson gson = getGson(false);
+                final SpeedItems speedItems = gson.fromJson(rs.getString("speed_items"), SpeedItems.class);
+                
+                if (speedItems != null)
+                {
+                    long lastTime = -1;
+                    for (SpeedItem item : speedItems.getAccumulatedSpeedItemsUpload()) {
+                    	JSONObject obj = new JSONObject();
+                    	final long time = Math.round((double)item.getTime() / 1000000);
+                    	if (time == lastTime)
+                    	    continue;
+                        obj.put("time_elapsed", time);
+                    	obj.put("bytes_total", item.getBytes());
+                    	uploadSpeeds.put(obj);
+                    	lastTime = time;
+                    }
+                    lastTime = -1;
+                    for (SpeedItem item : speedItems.getAccumulatedSpeedItemsDownload()) {
+                    	JSONObject obj = new JSONObject();
+                    	final long time = Math.round((double)item.getTime() / 1000000);
+                    	if (time == lastTime)
+                            continue;
+                    	obj.put("time_elapsed", time);
+                    	obj.put("bytes_total", item.getBytes());
+                    	downloadSpeeds.put(obj);
+                    	lastTime = time;
+                    }
+                }
+                
+                
+                
+                SignalGraph sigGraph = new SignalGraph(rs.getLong("test_uid"), rs.getTimestamp("client_time").getTime(), conn);
+                for (SignalGraph.SignalGraphItem item : sigGraph.getSignalList()) {
+                	JSONObject json = new JSONObject();
+                	json.put("time_elapsed",item.getTimeElapsed());
+                	json.put("network_type", item.getNetworkType());
+                 	json.put("signal_strength", item.getSignalStrength()); 
+                	json.put("lte_rsrp", item.getLteRsrp());
+                 	json.put("lte_rsrq", item.getLteRsrq());     
+                 	json.put("cat_technology", item.getCatTechnology());
+                	signalArray.put(json);
+                }
+                          
+                
+                
+                LocationGraph locGraph = new LocationGraph(rs.getLong("test_uid"),  rs.getTimestamp("client_time").getTime(), conn);
+                double totalDistance = locGraph.getTotalDistance();
+                for (LocationGraph.LocationGraphItem item : locGraph.getLocations()) {
+                	JSONObject json = new JSONObject();
+                	json.put("time_elapsed",item.getTimeElapsed());
+                	json.put("lat", item.getLatitude());
+                	json.put("long", item.getLongitude());
+                	json.put("loc_accuracy", (item.getAccuracy() > 0) ? item.getAccuracy() : JSONObject.NULL );
+                	locArray.put(json);
+                }
+                
+
+                
+                speedCurve.put("upload", uploadSpeeds);
+                speedCurve.put("download", downloadSpeeds);
+                speedCurve.put("signal", signalArray);
+                speedCurve.put("location", locArray);
+                response.put("speed_curve", speedCurve);
+                
+                if ((totalDistance > 0) &&
+                        totalDistance <= Double.parseDouble(settings.getString("RMBT_GEO_DISTANCE_DETAIL_LIMIT")))
+                    response.put("distance", totalDistance);
+                else
+                    response.put("distance", JSONObject.NULL);
+                
+            } else {
+                
+                setStatus(Status.CLIENT_ERROR_NOT_FOUND);
+                response.put("error","invalid open-uuid");
+            }
+        }
+        catch (final JSONException e) {
+            Logger.getLogger(OpenTestResource.class.getName()).log(Level.SEVERE, null, e);
+        } catch (SQLException ex) {
+            try {
+                setStatus(Status.CLIENT_ERROR_NOT_FOUND);
+                response.put("error","invalid open-uuid");
+            } catch (JSONException ex1) {
+                Logger.getLogger(OpenTestResource.class.getName()).log(Level.SEVERE, null, ex1);
+            }
+            Logger.getLogger(OpenTestResource.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        finally
+        {
+            try
+            {
+                if (rs != null)
+                    rs.close();
+                if (ps != null)
+                    ps.close();
+            }
+            catch (final SQLException e)
+            {
+                Logger.getLogger(OpenTestResource.class.getName()).log(Level.SEVERE, null, e);
+            }
+        }
+
+        return response.toString();
+    }
+        
+        // TODO
+
+    
+    public static class LocationGraph {
+    	private double totalDistance;
+    	private ArrayList<LocationGraphItem> locations = new ArrayList<>();
+    	
+    	
+    	public LocationGraph(long testUID, long testTime, java.sql.Connection conn) throws SQLException {
+    		PreparedStatement psLocation = conn.prepareStatement("SELECT test_id, g.geo_lat lat, g.geo_long long, g.accuracy loc_accuracy, time "
+            		+ "FROM geo_location g "
+            		+ "WHERE g.test_id = ? and provider != 'network' " 
+            		+ "ORDER BY time;");
+            psLocation.setLong(1, testUID);
+            ResultSet rsLocation = psLocation.executeQuery();
+            
+            boolean first = true;
+            boolean usedCurrentItem = false;
+            LocationGraphItem item = null;
+            
+            double lastLat=0;
+            double lastLong=0;
+            double lastAcc=0;
+            this.totalDistance=0;
+            while (rsLocation.next()) {
+            	long timeElapsed = rsLocation.getTimestamp("time").getTime() - testTime;
+            	
+            	
+            	if (first && timeElapsed > 0 && item != null) {
+            		this.locations.add(item);
+            		lastLat = item.getLatitude();
+    				lastLong = item.getLongitude();
+    				lastAcc = item.getAccuracy();
+            		first = false;
+            	}
+            	
+            	
+            	item = new LocationGraphItem(Math.max(timeElapsed,0), rsLocation.getDouble("long"), rsLocation.getDouble("lat"),  rsLocation.getDouble("loc_accuracy"));
+            	usedCurrentItem = false;
+            	
+            	
+            	if (!first) {
+            		
+            		
+            		
+            		double diff = OpenTestResource.distFrom(lastLat, lastLong, item.getLatitude(), item.getLongitude());
+            		
+            		double maxDiff = item.getAccuracy() + lastAcc;
+            		
+            		if (diff > maxDiff) {
+            			this.locations.add(item);
+                		lastLat = item.getLatitude();
+        				lastLong = item.getLongitude();
+        				lastAcc = item.getAccuracy();
+        				this.totalDistance += diff;
+            		}
+            		else {
+            			
+            			if (item.getAccuracy() < lastAcc) {
+            				this.locations.remove(this.locations.size()-1);
+            				this.locations.add(item);
+                    		lastLat = item.getLatitude();
+            				lastLong = item.getLongitude();
+            				lastAcc = item.getAccuracy();
+            			}
+            		}
+            		
+            		usedCurrentItem = true;
+            	}
+            }
+            
+            
+            if (!usedCurrentItem && this.locations.size() > 0) {
+            	
+            	
+            	
+            	this.locations.remove(this.locations.size()-1);
+				this.locations.add(item);
+        		lastLat = item.getLatitude();
+				lastLong = item.getLongitude();
+				lastAcc = item.getAccuracy();
+            	
+            }
+            
+            
+            
+            
+            rsLocation.close();
+            psLocation.close();
+    	}
+    	
+    	public double getTotalDistance() {
+    		return this.totalDistance;
+    	}
+    	
+    	public ArrayList<LocationGraphItem> getLocations() {
+    		return this.locations;
+    	}
+    	
+    	private class LocationGraphItem {
+    		private double longitude;
+    		private double latitude;
+    		private double accuracy;
+    		private long timeElapsed;
+    		
+    		public LocationGraphItem(long timeElapsed, double longitude, double latitude, double accuracy) {
+    			this.longitude = longitude;
+    			this.latitude = latitude;
+    			this.timeElapsed = timeElapsed;
+    			this.accuracy = accuracy;
+    		}
+    		
+    		
+    		public long getTimeElapsed() {
+    			return this.timeElapsed;
+    		}
+    		
+    		public double getLongitude() {
+    			return this.longitude;
+    		}
+    		
+    		public double getLatitude() {
+    			return this.latitude;
+    		}
+    		
+    		
+    		public double getAccuracy() {
+    			return this.accuracy;
+    		}
+    	}
+    }
+
+    public static class SignalGraph {
+    	private static int LOWER_BOUND = -1500;
+    	private static int MAX_TIME = 60000;
+    	
+    	private ArrayList<SignalGraphItem> signalList = new ArrayList<>();
+    	
+    	
+    	public SignalGraph(long testUID, long testTime, java.sql.Connection conn) throws SQLException {
+    		PreparedStatement psSignal = conn.prepareStatement("SELECT test_id, nt.name network_type, nt.group_name cat_technology, signal_strength, lte_rsrp, lte_rsrq, wifi_rssi, time "
+            		+ "FROM signal "
+            		+ "JOIN network_type nt "
+            		+ "ON nt.uid = network_type_id "
+            		+ "WHERE test_id = ? "
+            		+ "ORDER BY time;");
+            psSignal.setLong(1, testUID);
+            
+            ResultSet rsSignal = psSignal.executeQuery();
+            
+            boolean first = true;
+            SignalGraphItem item = null;
+            while (rsSignal.next()) {
+            	long timeElapsed = rsSignal.getTimestamp("time").getTime() - testTime;
+            	
+            	
+            	if (first && timeElapsed > 0 && item != null) {
+            		this.signalList.add(item);
+            		first = false;
+            	}
+            	
+            	
+            	if (timeElapsed > MAX_TIME) 
+            		break;
+            	
+            	
+            	int signalStrength = rsSignal.getInt("signal_strength");
+            	int lteRsrp = rsSignal.getInt("lte_rsrp");
+            	int lteRsrq = rsSignal.getInt("lte_rsrq");
+            	if (signalStrength == 0)
+            		signalStrength = rsSignal.getInt("wifi_rssi");
+            	
+            	if (signalStrength > LOWER_BOUND)
+            		item = new SignalGraphItem(Math.max(timeElapsed,0), rsSignal.getString("network_type"), signalStrength, lteRsrp, lteRsrq, rsSignal.getString("cat_technology"));
+            	
+            	
+            	
+            	if (!first || rsSignal.isLast()) {
+            		if (timeElapsed < 0) {
+            			item.timeElapsed = 1000;
+            		}
+            		this.signalList.add(item);
+            	}
+            }
+            
+            rsSignal.close();
+            psSignal.close();
+    	}
+    	
+    	public ArrayList<SignalGraphItem>getSignalList() {
+    		return this.signalList;
+    	}
+    	
+    	private class SignalGraphItem {
+    		private long timeElapsed;
+    		private String networkType;
+    		private int signalStrength;
+    		private int lteRsrp;
+    		private int lteRsrq;
+    		private String catTechnology;
+    		
+    		public SignalGraphItem(long timeElapsed, String networkType, int signalStrength, int lteRsrp, int lteRsrq, String catTechnology) {
+    			this.timeElapsed = timeElapsed;
+    			this.networkType = networkType;
+    			this.signalStrength = signalStrength;
+    			this.lteRsrp = lteRsrp;
+    			this.lteRsrq = lteRsrq;
+    			this.catTechnology = catTechnology;
+    		}
+    		
+    		
+    		public long getTimeElapsed() {
+    			return this.timeElapsed;
+    		}
+    		
+    		
+    		public String getNetworkType() {
+    			return this.networkType;
+    		}
+
+       		
+    		public int getSignalStrength() {
+    			return this.signalStrength;
+    		}
+
+       		
+    		public int getLteRsrp() {
+    			return this.lteRsrp;
+    		}
+    		
+       		
+    		public int getLteRsrq() {
+    			return this.lteRsrq;
+    		}
+    		
+    		public String getCatTechnology() {
+    			return this.catTechnology;
+    		}
+
+    	}
+    }
+}

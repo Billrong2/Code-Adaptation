@@ -1,0 +1,4 @@
+{
+  "code": "String step4(String str) {\n\tString[] suffixes = { \"al\", \"ance\", \"ence\", \"er\", \"ic\", \"able\", \"ible\", \"ant\", \"ement\", \"ment\", \"ent\", \"sion\", \"tion\", \"ou\", \"ism\", \"ate\", \"iti\", \"ous\", \"ive\", \"ize\", \"ise\" };\n\tNewString stem = new NewString();\n\n\tfor (int index = 0; index < suffixes.length; index++) {\n\t\tif (hasSuffix(str, suffixes[index], stem)) {\n\t\t\tif (measure(stem.str) > 1) {\n\t\t\t\tstr = stem.str;\n\t\t\t\treturn str;\n\t\t\t}\n\t\t}\n\t}\n\treturn str;\n}",
+  "explanation": "code_hardening: none\nresolve_compilation_errors: none\nexception_handling: none\nlogic_customization: none\nrefactoring: none\nmisc: Reformatted whitespace and brace placement to match surrounding project style and consolidated the suffixes array declaration onto a single line while preserving all existing logic, control flow, and data unchanged."
+}

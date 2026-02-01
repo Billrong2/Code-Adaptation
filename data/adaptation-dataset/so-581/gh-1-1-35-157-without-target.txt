@@ -1,0 +1,20 @@
+package uk.bl.wa.extract;
+
+
+
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+public class Times {
+		// TODO
+
+
+	private static Matcher checkDatePattern(String regex, String text) {
+	    Pattern p = Pattern.compile(regex, Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+	    return p.matcher(text);
+	}
+}

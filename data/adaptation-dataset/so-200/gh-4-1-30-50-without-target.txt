@@ -1,0 +1,18 @@
+package org.biojava.nbio.structure.symmetry.utils;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+import org.biojava.nbio.structure.symmetry.core.QuatSymmetryDetector;
+
+
+public class PowerSet<T> {
+
+	public PowerSet() {
+	}
+
+		// TODO
+
+}

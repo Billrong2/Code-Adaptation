@@ -1,0 +1,264 @@
+package fr.neamar.kiss;
+
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
+import android.content.pm.PackageManager.NameNotFoundException;
+import android.content.pm.ResolveInfo;
+import android.content.res.Resources;
+import android.graphics.Bitmap;
+import android.graphics.Bitmap.CompressFormat;
+import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffXfermode;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
+import android.preference.PreferenceManager;
+import android.util.Log;
+
+import org.xmlpull.v1.XmlPullParser;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+
+
+
+public class IconsHandler {
+
+    private static final String TAG = "IconsHandler";
+    
+    private HashMap<String, String> iconsPacks = new HashMap<>();
+    
+    private Map<String, String> packagesDrawables = new HashMap<>();
+    
+    private Resources iconPackres;
+    
+    private String iconsPackPackageName;
+    
+    private List<Bitmap> backImages = new ArrayList<>();
+    
+    private Bitmap maskImage = null;
+    
+    private Bitmap frontImage = null;
+    
+    private float factor = 1.0f;
+    private PackageManager pm;
+    private Context ctx;
+
+    public IconsHandler(Context ctx) {
+        super();
+        this.ctx = ctx;
+        this.pm = ctx.getPackageManager();
+        loadAvailableIconsPacks();
+        loadIconsPack();
+    }
+
+    
+    public void loadIconsPack() {
+
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(ctx);
+        loadIconsPack(prefs.getString("icons-pack", "default"));
+
+    }
+
+        // TODO
+
+
+    private Bitmap loadBitmap(String drawableName) {
+        int id = iconPackres.getIdentifier(drawableName, "drawable", iconsPackPackageName);
+        if (id > 0) {
+            
+            Drawable bitmap = iconPackres.getDrawable(id);
+            if (bitmap instanceof BitmapDrawable) {
+                return ((BitmapDrawable) bitmap).getBitmap();
+            }
+        }
+        return null;
+    }
+
+    
+    public Drawable getDrawableIconForPackage(ComponentName componentName) {
+        try {
+            
+            if (iconsPackPackageName.equalsIgnoreCase("default")) {
+                return pm.getActivityIcon(componentName);
+            }
+
+            String drawable = packagesDrawables.get(componentName.toString());
+            if (drawable != null) { 
+                int id = iconPackres.getIdentifier(drawable, "drawable", iconsPackPackageName);
+                if (id > 0) {
+                    
+                    return iconPackres.getDrawable(id);
+                }
+            }
+
+            
+            Drawable systemIcon = cacheGetDrawable(componentName.toString());
+            if (systemIcon != null)
+                return systemIcon;
+
+            systemIcon = pm.getActivityIcon(componentName);
+            if (systemIcon instanceof BitmapDrawable) {
+                Drawable generated = generateBitmap(systemIcon);
+                cacheStoreDrawable(componentName.toString(), generated);
+                return generated;
+            }
+            return systemIcon;
+
+        } catch (NameNotFoundException e) {
+            Log.e(TAG, "Unable to found component " + componentName.toString() + e);
+            return null;
+        }
+    }
+
+    private Drawable generateBitmap(Drawable defaultBitmap) {
+
+        
+        if (backImages.size() == 0) {
+            return defaultBitmap;
+        }
+
+        
+        Random r = new Random();
+        int backImageInd = r.nextInt(backImages.size());
+        Bitmap backImage = backImages.get(backImageInd);
+        int w = backImage.getWidth();
+        int h = backImage.getHeight();
+
+        
+        Bitmap result = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(result);
+
+        
+        canvas.drawBitmap(backImage, 0, 0, null);
+
+        
+        Bitmap scaledBitmap = Bitmap.createScaledBitmap(((BitmapDrawable) defaultBitmap).getBitmap(), (int) (w * factor), (int) (h * factor), false);
+
+        if (maskImage != null) {
+            
+            Bitmap mutableMask = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+            Canvas maskCanvas = new Canvas(mutableMask);
+            maskCanvas.drawBitmap(maskImage, 0, 0, new Paint());
+
+            
+            Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.DST_OUT));
+            canvas.drawBitmap(scaledBitmap, (w - scaledBitmap.getWidth()) / 2, (h - scaledBitmap.getHeight()) / 2, null);
+            canvas.drawBitmap(mutableMask, 0, 0, paint);
+            paint.setXfermode(null);
+        } else { 
+            canvas.drawBitmap(scaledBitmap, (w - scaledBitmap.getWidth()) / 2, (h - scaledBitmap.getHeight()) / 2, null);
+        }
+
+        
+        if (frontImage != null) {
+            canvas.drawBitmap(frontImage, 0, 0, null);
+        }
+
+        return new BitmapDrawable(iconPackres, result);
+    }
+
+    
+    private void loadAvailableIconsPacks() {
+
+        List<ResolveInfo> launcherthemes = pm.queryIntentActivities(new Intent("fr.neamar.kiss.THEMES"), PackageManager.GET_META_DATA);
+        List<ResolveInfo> adwlauncherthemes = pm.queryIntentActivities(new Intent("org.adw.launcher.THEMES"), PackageManager.GET_META_DATA);
+
+        launcherthemes.addAll(adwlauncherthemes);
+
+        for (ResolveInfo ri : launcherthemes) {
+            String packageName = ri.activityInfo.packageName;
+            try {
+                ApplicationInfo ai = pm.getApplicationInfo(packageName, PackageManager.GET_META_DATA);
+                String name = pm.getApplicationLabel(ai).toString();
+                iconsPacks.put(packageName, name);
+            } catch (PackageManager.NameNotFoundException e) {
+                
+                Log.e(TAG, "Unable to found package " + packageName + e);
+            }
+        }
+    }
+
+    public HashMap<String, String> getIconsPacks() {
+        return iconsPacks;
+    }
+
+    private boolean isDrawableInCache(String key) {
+        File drawableFile = cacheGetFileName(key);
+        return drawableFile.isFile();
+    }
+
+    private boolean cacheStoreDrawable(String key, Drawable drawable) {
+        if (drawable instanceof BitmapDrawable) {
+            File drawableFile = cacheGetFileName(key);
+            FileOutputStream fos;
+            try {
+                fos = new FileOutputStream(drawableFile);
+                ((BitmapDrawable) drawable).getBitmap().compress(CompressFormat.PNG, 100, fos);
+                fos.flush();
+                fos.close();
+                return true;
+            } catch (Exception e) {
+                Log.e(TAG, "Unable to store drawable in cache " + e);
+            }
+        }
+        return false;
+    }
+
+    private Drawable cacheGetDrawable(String key) {
+
+        if (!isDrawableInCache(key)) {
+            return null;
+        }
+
+        FileInputStream fis;
+        try {
+            fis = new FileInputStream(cacheGetFileName(key));
+            BitmapDrawable drawable =
+                    new BitmapDrawable(this.ctx.getResources(), BitmapFactory.decodeStream(fis));
+            fis.close();
+            return drawable;
+        } catch (Exception e) {
+            Log.e(TAG, "Unable to get drawable from cache " + e);
+        }
+
+        return null;
+    }
+
+    
+    private File cacheGetFileName(String key) {
+        return new File(getIconsCacheDir() + iconsPackPackageName + "_" + key.hashCode() + ".png");
+    }
+
+    private File getIconsCacheDir() {
+        return new File(this.ctx.getCacheDir().getPath() + "/icons/");
+    }
+
+    
+    private void cacheClear() {
+        File cacheDir = this.getIconsCacheDir();
+
+        if (!cacheDir.isDirectory())
+            return;
+
+        for (File item : cacheDir.listFiles()) {
+            if (!item.delete()) {
+                Log.w(TAG, "Failed to delete file: " + item.getAbsolutePath());
+            }
+        }
+    }
+
+}

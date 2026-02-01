@@ -1,0 +1,60 @@
+package org.geogebra.desktop.gui.virtualkeyboard;
+
+import java.awt.AWTException;
+import java.awt.Robot;
+import java.awt.event.KeyEvent;
+
+
+
+public class WindowsUnicodeKeyboard extends Keyboard {
+
+	private Robot robot;
+
+	public WindowsUnicodeKeyboard(Robot robot) {
+		super(robot);
+		this.robot = robot;
+	}
+
+	public WindowsUnicodeKeyboard() throws AWTException {
+		super();
+		this.robot = super.robot;
+	}
+
+	@Override
+	public void type(char character) {
+		try {
+			super.type(character);
+		} catch (IllegalArgumentException e) {
+
+			int unicodeDigits = character;
+			
+			robot.keyPress(KeyEvent.VK_ALT);
+
+			try { 
+
+				
+				int digit = unicodeDigits / 1000;
+				unicodeDigits -= digit * 1000;
+				typeNumPad(digit);
+				digit = unicodeDigits / 100;
+				unicodeDigits -= digit * 100;
+				typeNumPad(digit);
+				digit = unicodeDigits / 10;
+				unicodeDigits -= digit * 10;
+				typeNumPad(digit);
+				typeNumPad(unicodeDigits);
+			} catch (Exception ex) {
+				ex.printStackTrace();
+			}
+
+			robot.keyRelease(KeyEvent.VK_ALT);
+
+		}
+	}
+
+	// TODO
+
+
+}
+
+

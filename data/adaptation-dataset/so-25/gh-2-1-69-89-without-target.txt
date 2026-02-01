@@ -1,0 +1,55 @@
+package org.geogebra.common.kernel.prover;
+
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Set;
+
+
+
+public class Combinations implements Iterator<Object> {
+
+	private Set<?> set;
+	private int r, n;
+	private int[] num; 
+	private boolean done = false;
+
+	private Object[] list;
+
+	
+	public Combinations(Set<?> inputSet, int order) {
+		set = inputSet;
+		n = inputSet.size();
+		r = order;
+		if (n < r) { 
+			done = true;
+			return;
+		}
+		num = new int[r];
+		for (int i = 0; i < r; i++) {
+			num[i] = i + 1;
+		}
+		list = new Object[n];
+		list = set.toArray();
+	}
+
+	public boolean hasNext() {
+		return !done;
+	}
+
+	public Set<Object> next() {
+		Set<Object> ret = new HashSet<Object>();
+		for (int i = 0; i < r; ++i) {
+			ret.add(list[num[i] - 1]);
+		}
+		done = nextNum();
+		return ret;
+	}
+
+	// TODO
+
+
+	public void remove() {
+		
+
+	}
+}

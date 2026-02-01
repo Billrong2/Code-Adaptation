@@ -1,0 +1,127 @@
+package com.datasalt.trident;
+
+import java.io.IOException;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Map;
+import java.util.Random;
+
+import org.apache.commons.io.IOUtils;
+
+import storm.trident.operation.TridentCollector;
+import storm.trident.spout.IBatchSpout;
+import backtype.storm.Config;
+import backtype.storm.task.TopologyContext;
+import backtype.storm.tuple.Fields;
+import backtype.storm.tuple.Values;
+
+
+@SuppressWarnings({ "serial", "rawtypes" })
+public class FakeTweetsBatchSpout implements IBatchSpout {
+
+	private int batchSize;
+
+	public final static String[] ACTORS = { "stefan", "dave", "pere", "nathan", "doug", "ted", "mary",
+	    "rose" };
+	public final static String[] LOCATIONS = { "Spain", "USA", "Spain", "USA", "USA", "USA", "UK",
+	    "France" };
+	public final static String[] SUBJECTS = { "berlin", "justinbieber", "hadoop", "life", "bigdata" };
+
+	private double[] activityDistribution;
+	private double[][] subjectInterestDistribution;
+	private Random randomGenerator;
+	private String[] sentences;
+
+	private long tweetId = 0;
+
+	public FakeTweetsBatchSpout() throws IOException {
+		this(5);
+	}
+
+	public FakeTweetsBatchSpout(int batchSize) throws IOException {
+		this.batchSize = batchSize;
+	}
+
+	@SuppressWarnings("unchecked")
+  @Override
+	public void open(Map conf, TopologyContext context) {
+		
+		System.err.println("Open Spout instance");
+		this.randomGenerator = new Random();
+		
+		try {
+			sentences = (String[]) IOUtils.readLines(
+			    ClassLoader.getSystemClassLoader().getResourceAsStream("500_sentences_en.txt")).toArray(new String[0]);
+		} catch(IOException e) {
+			throw new RuntimeException(e);
+		}
+		
+		this.activityDistribution = getProbabilityDistribution(ACTORS.length, randomGenerator);
+		
+		this.subjectInterestDistribution = new double[ACTORS.length][];
+		for(int i = 0; i < ACTORS.length; i++) {
+			this.subjectInterestDistribution[i] = getProbabilityDistribution(SUBJECTS.length, randomGenerator);
+		}
+	}
+
+	@Override
+	public void emitBatch(long batchId, TridentCollector collector) {
+		
+		for(int i = 0; i < batchSize; i++) {
+			collector.emit(getNextTweet());
+		}
+	}
+
+	@Override
+	public void ack(long batchId) {
+		
+	}
+
+	@Override
+	public void close() {
+		
+	}
+
+	@Override
+	public Map getComponentConfiguration() {
+		
+		return new Config();
+	}
+
+	@Override
+	public Fields getOutputFields() {
+		return new Fields("id", "text", "actor", "location", "date");
+	}
+
+	
+	
+	private SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss aa");
+
+	private Values getNextTweet() {
+		int actorIndex = randomIndex(activityDistribution, randomGenerator);
+		String author = ACTORS[actorIndex];
+		String text = sentences[randomGenerator.nextInt(sentences.length)].trim() + " #"
+		    + SUBJECTS[randomIndex(subjectInterestDistribution[actorIndex], randomGenerator)];
+		return new Values(++tweetId + "", text, author, LOCATIONS[actorIndex], DATE_FORMAT.format(System
+		    .currentTimeMillis()));
+	}
+
+		// TODO
+
+
+	private static int randomIndex(double[] distribution, Random randomGenerator) {
+		double rnd = randomGenerator.nextDouble();
+		double accum = 0;
+		int index = 0;
+		for(; index < distribution.length && accum < rnd; index++, accum += distribution[index - 1])
+			;
+		return index - 1;
+	}
+
+	public static void main(String[] args) throws IOException, ParseException {
+		FakeTweetsBatchSpout spout = new FakeTweetsBatchSpout();
+		spout.open(null, null);
+		for(int i = 0; i < 30; i++)
+			System.out.println(spout.getNextTweet());
+	}
+}

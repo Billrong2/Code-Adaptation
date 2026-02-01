@@ -1,0 +1,140 @@
+
+
+package uk.ac.babraham.BamQC.Utilities;
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.util.Properties;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
+
+import org.apache.log4j.Logger;
+
+import uk.ac.babraham.BamQC.Preferences.BamQCPreferences;
+import uk.ac.babraham.BamQC.Network.DownloadableGenomes.DownloadableGenomeSet;
+import uk.ac.babraham.BamQC.Network.DownloadableGenomes.GenomeAssembly;
+import uk.ac.babraham.BamQC.Network.DownloadableGenomes.GenomeSpecies;
+
+
+
+
+public class BamQCListGenomes {
+	
+	private static Logger log = Logger.getLogger(BamQCListGenomes.class);
+
+	
+	public static GenomeSpecies[] listAvailableGenomes(String regex) {
+		
+		System.out.println("List of genomes (species [ assemblies ]) retrieved from the " 
+				 + "Babraham Servers:");
+		
+		GenomeSpecies[] gs = null;
+		
+		try {
+			Pattern pattern = Pattern.compile(regex);
+			Matcher matcher = null;
+			String[] allSpeciesAssemblies = null;
+			
+			DownloadableGenomeSet dgs = new DownloadableGenomeSet();		
+
+			gs = dgs.species();
+			if(gs.length > 0) {
+				allSpeciesAssemblies = new String[gs.length];
+				
+				
+				for(int i=0;i<gs.length;i++) {
+					allSpeciesAssemblies[i] = gs[i].name() + " [ ";
+					GenomeAssembly[] ga = gs[i].assemblies();
+					for(int j=0;j<ga.length;j++) {
+						allSpeciesAssemblies[i] += ga[j].assembly();
+						if(j < ga.length-1) {
+							allSpeciesAssemblies[i] += " | ";
+						}
+					}
+					allSpeciesAssemblies[i] += " ]";
+				}
+				
+				
+				for(int i=0; i<allSpeciesAssemblies.length; i++) {
+					matcher = pattern.matcher(allSpeciesAssemblies[i]);
+					if(matcher.find()) {
+						System.out.println(allSpeciesAssemblies[i]);
+					}
+				}
+				
+			} else {
+				System.out.println("Something went wrong. No species was retrieved from the " 
+								 + "Babraham Servers. Is your Internet connection working?");
+			}
+			
+		} catch (IOException e) {
+			log.error(e, e);
+		} catch (PatternSyntaxException e) {
+			log.error("The regular expression " + regex + " is not valid.", e);
+			System.out.println("The regular expression " + regex + " is not valid.");
+		}
+		return gs;
+	}
+
+	
+	
+	
+	
+	public static File[] listSavedGenomes() {
+		File[] genomes = null;
+		try {
+			genomes = BamQCPreferences.getInstance().getGenomeBase().listFiles();
+			if (genomes == null) {
+				throw new FileNotFoundException();
+			}
+		} 
+		catch (FileNotFoundException e) {
+			System.out.println("Could not find the folder containing your genomes. "
+					         + "Please check your file preferences.");
+			return genomes;
+		}
+		System.out.println("Downloaded genomes:");
+		for(int i=0; i<genomes.length; i++) {
+			System.out.println(genomes[i]);
+		}
+		return genomes;
+	}
+	
+	
+	
+	
+	
+		// TODO
+
+	
+
+	public static void main(String[] args) {
+		
+	    Properties properties = System.getProperties();
+	    
+	    if(properties.getProperty("bamqc.saved_genomes") != null && 
+	       properties.getProperty("bamqc.saved_genomes").equals("true")) {
+			BamQCListGenomes.listSavedGenomes();	
+	    
+	    } else if(properties.getProperty("bamqc.available_genomes") != null && 
+	    		  properties.getProperty("bamqc.available_genomes").equals("true")) {
+	    	
+	    	
+			boolean matchWholeString = false;
+			String pattern = "*", regex = "";
+			if(properties.getProperty("bamqc.genome_pattern") != null && 
+	    	   !properties.getProperty("bamqc.genome_pattern").equals("")) {
+				pattern = properties.getProperty("bamqc.genome_pattern");
+			}			
+			regex = convertGlobToRegex(pattern, matchWholeString);
+			BamQCListGenomes.listAvailableGenomes(regex);			
+	    
+	    } else {
+			System.out.println("Please, use the option '--saved-genomes' or '--available-genomes'");
+	    }	    
+	    
+	}
+	
+}

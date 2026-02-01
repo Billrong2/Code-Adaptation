@@ -1,0 +1,220 @@
+package de.fencing_game.paul.examples;
+
+import java.util.*;
+
+
+public class FiniteSubSets<X>
+    extends AbstractSet<Set<X>> {
+
+    private final Set<X> baseSet;
+    private final int subSize;
+
+    
+    public FiniteSubSets(Set<X> baseSet, int subSetSize) {
+        this.baseSet = baseSet;
+        this.subSize = subSetSize;
+    }
+
+    
+    public int size() {
+        int baseSize = baseSet.size();
+        long size = binomialCoefficient(baseSize, subSize);
+        return (int)Math.min(size, Integer.MAX_VALUE);
+    }
+
+    public Iterator<Set<X>> iterator() {
+        if(subSize == 0) {
+            
+            return Collections.singleton(Collections.<X>emptySet()).iterator();
+        }
+        return new IteratorImpl();
+    }
+
+    
+    public boolean contains(Object o) {
+        return o instanceof Set && 
+            ((Set)o).size() == subSize &&
+            baseSet.containsAll((Set)o);
+    }
+
+    
+    
+    private class IteratorImpl implements Iterator<Set<X>> {
+
+        
+        private Deque<Iterator<X>> stack = new ArrayDeque<Iterator<X>>(subSize);
+        
+        private Node current;
+
+        
+        IteratorImpl() {
+            try {
+                for(int i = 0; i < subSize; i++) {
+                    initOneIterator();
+                }
+            }
+            catch(NoSuchElementException ex) {
+                current = null;
+            }
+            
+        }
+
+        
+        private void initOneIterator() {
+            Iterator<X> it = baseSet.iterator();
+            if(current != null) {
+                scrollTo(it, current.element);
+            }
+
+            X element = it.next();
+            current = new Node(current, element);
+            stack.push(it);
+        }
+
+        
+        public Set<X> next() {
+            if(current == null) {
+                throw new NoSuchElementException();
+            }
+            Set<X> result = new SubSetImpl(current);
+            step();
+            return result;
+        }
+
+        
+        public boolean hasNext() {
+            return current != null;
+        }
+
+        
+        public void remove() {
+            throw new UnsupportedOperationException();
+        }
+
+
+        
+        void step() {
+            Iterator<X> lastIt = stack.peek();
+            current = current.next;
+            while(!lastIt.hasNext()) {
+                if(current == null) {
+                    
+                    
+                    return;
+                }
+
+                
+                
+                stack.pop();
+                assert current != null;
+                step();
+                if(current == null) {
+                    
+                    return;
+                }
+                assert current != null;
+                
+                
+                lastIt = baseSet.iterator();
+                if(!scrollTo(lastIt, current.element)) {
+                    
+                    current = null;
+                    throw new ConcurrentModificationException
+                        ("Element " + current.element + " not found!");
+                }
+                stack.push(lastIt);
+            }
+            
+            
+
+            X lastElement = lastIt.next();
+            current = new Node(current, lastElement);
+
+        }  
+
+    }
+
+    
+    private static <Y> boolean scrollTo(Iterator<? extends Y> it, Y element) {
+        while(it.hasNext()) {
+            Y itEl = it.next();
+            if(itEl.equals(element)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    
+    private class SubSetImpl extends AbstractSet<X>
+    {
+        private final Node node;
+
+        SubSetImpl(Node n) {
+            this.node = n;
+        }
+
+        
+        public int size() {
+            return subSize;
+        }
+
+        
+        public Iterator<X> iterator() {
+            return new Iterator<X>() {
+                private Node current = SubSetImpl.this.node;
+                public X next() {
+                    if(current == null) {
+                        throw new NoSuchElementException();
+                    }
+                    X result = current.element;
+                    current = current.next;
+                    return result;
+                }
+                public boolean hasNext() {
+                    return current != null;
+                }
+                public void remove() {
+                    throw new UnsupportedOperationException();
+                }
+            };
+        }
+    }
+
+    
+    private class Node {
+        Node(Node n, X e) {
+            this.next = n;
+            this.element = e;
+        }
+
+        final X element;
+        final Node next;
+        
+        public String toString() {
+            return "[" + element + "]==>" + next;
+        }
+    }
+
+    
+    private static long binomialCoefficient(int n, int k) {
+        if(k < 0 || n < k ) {
+            return 0;
+        }
+        final int n_minus_k = n - k;
+        if (k > n/2) {
+            return binomialCoefficient(n, n_minus_k);
+        }
+        long prod = 1;
+        for(int i = 1; i <= k; i++) {
+            prod = prod * (n_minus_k + i) / i;
+        }
+        return prod;
+    }
+
+
+        // TODO
+
+
+
+}

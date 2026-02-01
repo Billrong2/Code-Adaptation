@@ -1,0 +1,64 @@
+package org.jolokia.client;
+
+import java.io.IOException;
+
+import org.apache.http.*;
+import org.apache.http.auth.*;
+import org.apache.http.client.CredentialsProvider;
+import org.apache.http.client.protocol.HttpClientContext;
+import org.apache.http.impl.auth.BasicScheme;
+import org.apache.http.impl.client.BasicCredentialsProvider;
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.protocol.HttpContext;
+
+
+public class BasicAuthenticator implements J4pAuthenticator {
+
+    
+    private boolean preemptive = false;
+
+    public BasicAuthenticator() {
+        this(false);
+    }
+
+    
+    public BasicAuthenticator(boolean pPreemptive) {
+        preemptive = pPreemptive;
+    }
+
+    
+    public J4pAuthenticator preemptive() {
+        preemptive = true;
+        return this;
+    }
+
+    
+    public void authenticate(HttpClientBuilder pBuilder, String pUser, String pPassword) {
+        
+        CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
+        credentialsProvider.setCredentials(
+                new AuthScope(AuthScope.ANY),
+                new UsernamePasswordCredentials(pUser, pPassword));
+        pBuilder.setDefaultCredentialsProvider(credentialsProvider);
+        if (preemptive) {
+            pBuilder.addInterceptorFirst(new PreemptiveAuthInterceptor(new BasicScheme()));
+        }
+    }
+
+
+    
+
+    
+    static class PreemptiveAuthInterceptor implements HttpRequestInterceptor {
+
+        
+        private AuthScheme authScheme;
+
+        PreemptiveAuthInterceptor(AuthScheme pScheme) {
+            authScheme = pScheme;
+        }
+
+                // TODO
+
+    }
+}

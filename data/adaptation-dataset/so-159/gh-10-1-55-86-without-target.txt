@@ -1,0 +1,65 @@
+package gr.uoa.di.android.helpers.net;
+
+import android.annotation.TargetApi;
+import android.content.Context;
+import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
+import android.os.Build;
+
+import org.apache.http.conn.util.InetAddressUtils;
+
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.SocketException;
+import java.util.Collections;
+import java.util.List;
+
+
+public final class Addresses {
+
+	private Addresses() {}
+
+	
+	public static String getCurrentSsid(Context ctx) {
+		String ssid = null;
+		if (Net.isWifiConnected(ctx)) {
+			WifiManager wm = (WifiManager) ctx
+				.getSystemService(Context.WIFI_SERVICE);
+			final WifiInfo connectionInfo = wm.getConnectionInfo();
+			if (connectionInfo != null) {
+				ssid = connectionInfo.getSSID();
+				if (ssid != null && "".equals(ssid.trim())) ssid = null;
+			}
+		}
+		return ssid;
+	}
+
+		// TODO
+
+
+	
+	@TargetApi(Build.VERSION_CODES.GINGERBREAD)
+	public static String getMACAddress(String interfaceName)
+			throws SocketException {
+		if (android.os.Build.VERSION.SDK_INT < Build.VERSION_CODES.GINGERBREAD) {
+			throw new RuntimeException("You can use getMACAddress() only "
+				+ "after API " + Build.VERSION_CODES.GINGERBREAD);
+		}
+		List<NetworkInterface> interfaces = Collections.list(NetworkInterface
+			.getNetworkInterfaces());
+		for (NetworkInterface intf : interfaces) {
+			if (interfaceName != null) {
+				if (!intf.getName().equalsIgnoreCase(interfaceName)) continue;
+			}
+			byte[] mac = intf.getHardwareAddress();
+			if (mac == null) return "";
+			StringBuilder buf = new StringBuilder();
+			for (int idx = 0; idx < mac.length; idx++)
+				buf.append(String.format("%02X:", mac[idx]));
+			if (buf.length() > 0) buf.deleteCharAt(buf.length() - 1);
+			return buf.toString();
+		}
+		return "";
+		
+	}
+}

@@ -1,0 +1,57 @@
+package com.jbirdvegas.mgerrit.helpers;
+
+import android.content.Context;
+import android.text.Spannable;
+import android.text.style.ImageSpan;
+import com.jbirdvegas.mgerrit.R;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+
+public class EmoticonSupportHelper {
+    private static final Spannable.Factory spannableFactory
+            = Spannable.Factory.getInstance();
+
+    private static final Map<Pattern, Integer> emoticons
+            = new HashMap<>(0);
+
+    static {
+        
+        addPattern(emoticons, ":)", R.drawable.emo_im_happy);
+        addPattern(emoticons, ":-)", R.drawable.emo_im_happy);
+        addPattern(emoticons, ":'(", R.drawable.emo_im_crying);
+        addPattern(emoticons, ":-/", R.drawable.emo_im_undecided);
+        addPattern(emoticons, "0:-)", R.drawable.emo_im_angel);
+        addPattern(emoticons, "o:-)", R.drawable.emo_im_angel);
+        addPattern(emoticons, "O:-)", R.drawable.emo_im_angel);
+        addPattern(emoticons, ":-[", R.drawable.emo_im_embarrassed);
+        addPattern(emoticons, ":-!", R.drawable.emo_im_foot_in_mouth);
+        addPattern(emoticons, ":-$", R.drawable.emo_im_money_mouth);
+        addPattern(emoticons, "B-)", R.drawable.emo_im_cool);
+        addPattern(emoticons, ":O", R.drawable.emo_im_yelling);
+        addPattern(emoticons, ":-*", R.drawable.emo_im_kissing);
+        addPattern(emoticons, "=-O", R.drawable.emo_im_surprised);
+        addPattern(emoticons, ":-P", R.drawable.emo_im_tongue_sticking_out);
+        addPattern(emoticons, ";-)", R.drawable.emo_im_winking);
+        addPattern(emoticons, ":-(", R.drawable.emo_im_sad);
+        
+        addPattern(emoticons, ">-<", R.drawable.emo_im_chuck);
+    }
+
+    private static void addPattern(Map<Pattern, Integer> map, String smile,
+                                   int resource) {
+        map.put(Pattern.compile(Pattern.quote(smile)), resource);
+    }
+
+    // TODO
+
+
+    public static Spannable getSmiledText(Context context, CharSequence text) {
+        Spannable spannable = spannableFactory.newSpannable(text);
+        addSmiles(context, spannable);
+        return spannable;
+    }
+}

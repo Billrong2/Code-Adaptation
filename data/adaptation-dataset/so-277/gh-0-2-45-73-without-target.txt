@@ -1,0 +1,31 @@
+
+package org.powermock.modules.junit4.common.internal.impl;
+
+
+class VersionTokenizer {
+    private final String _versionString;
+    private final int _length;
+
+    private int _position;
+    private int _number;
+    private String _suffix;
+
+    public int getNumber() {
+        return _number;
+    }
+
+    public String getSuffix() {
+        return _suffix;
+    }
+
+    public VersionTokenizer(String versionString) {
+        if (versionString == null)
+            throw new IllegalArgumentException("versionString is null");
+
+        _versionString = versionString;
+        _length = versionString.length();
+    }
+
+    // TODO
+
+}

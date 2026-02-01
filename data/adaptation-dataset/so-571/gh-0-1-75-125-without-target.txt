@@ -1,0 +1,36 @@
+
+package org.openimaj.math.util;
+
+
+
+public class MathUtils {
+
+	
+	public static double logSum(final double log_a, final double log_b) {
+		double v;
+
+		if (log_a < log_b) {
+			v = log_b + Math.log(1 + Math.exp(log_a - log_b));
+		} else {
+			v = log_a + Math.log(1 + Math.exp(log_b - log_a));
+		}
+		return (v);
+	}
+
+	
+	public static int nextPowerOf2(final int n) {
+		return (int) Math.pow(2, 32 - Integer.numberOfLeadingZeros(n - 1));
+	}
+
+		// TODO
+
+
+	
+	public static class ExponentAndMantissa {
+		
+		public int exponent;
+
+		
+		public double mantissa;
+	}
+}

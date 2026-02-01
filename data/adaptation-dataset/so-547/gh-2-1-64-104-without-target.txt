@@ -1,0 +1,67 @@
+package agent;
+
+import java.io.*;
+import java.util.*;
+
+import org.apache.commons.lang.StringEscapeUtils;
+
+public class Utils {
+
+    public static String deFux(String v) throws Exception {
+        
+        byte[] b = v.getBytes("ISO-8859-1");
+        boolean changed = false;
+        for (int i = 0; i < b.length; i++) {
+            
+            if ((b[i] >= 0 && b[i] < 32) && b[i] != 13  && b[i] != 10  && b[i] != 9) {
+                b[i] = 32;
+                changed = true;
+            }
+            
+            
+            
+            if (b[i] == '^' || b[i] == '"' || b[i] == '\\') {
+                b[i] = 32;
+                changed = true;
+            }
+        }
+        if (changed) {
+            v = new String(b, "ISO-8859-1");
+        }
+        v = Utils.fixEncoding(v);
+        return v;
+    }
+
+    public static String deFuxMore(String v) throws Exception {
+        byte[] b = v.getBytes("ISO-8859-1");
+        boolean changed = false;
+        for (int i = 0; i < b.length; i++) {
+            
+            if (b[i] >= 0 && b[i] < 32) {
+                b[i] = 32;
+                changed = true;
+            }
+        }
+        if (changed) {
+            v = new String(b, "ISO-8859-1");
+        }
+        return v;
+    }
+
+    
+    public static String fixEncoding(String latin1) {
+        try {
+            byte[] bytes = latin1.getBytes("ISO-8859-1");
+            if (!Utils.validUTF8(bytes))
+                return latin1;   
+            return new String(bytes, "UTF-8");  
+        } catch (UnsupportedEncodingException e) {
+            
+            throw new IllegalStateException("No Latin1 or UTF-8: " + e.getMessage());
+        }
+     }
+
+    // TODO
+
+
+}

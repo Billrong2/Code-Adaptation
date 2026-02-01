@@ -1,0 +1,279 @@
+package io.sweers.testutils;
+
+import android.app.Activity;
+import android.graphics.Bitmap;
+import android.os.Environment;
+import android.os.SystemClock;
+import android.support.annotation.CheckResult;
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
+import android.support.test.InstrumentationRegistry;
+import android.support.test.espresso.PerformException;
+import android.support.test.espresso.UiController;
+import android.support.test.espresso.ViewAction;
+import android.support.test.espresso.matcher.BoundedMatcher;
+import android.support.test.espresso.util.HumanReadables;
+import android.support.test.espresso.util.TreeIterables;
+import android.support.test.runner.lifecycle.ActivityLifecycleMonitorRegistry;
+import android.support.test.runner.lifecycle.Stage;
+import android.view.View;
+import android.widget.TextView;
+
+import com.google.common.collect.Iterables;
+
+import org.hamcrest.Description;
+import org.hamcrest.Matcher;
+import org.hamcrest.TypeSafeMatcher;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.Collection;
+import java.util.concurrent.TimeoutException;
+
+import static android.support.test.espresso.Espresso.pressBack;
+import static android.support.test.espresso.matcher.ViewMatchers.isAssignableFrom;
+import static android.support.test.espresso.matcher.ViewMatchers.isRoot;
+import static com.google.common.truth.Truth.assertThat;
+import static org.hamcrest.Matchers.is;
+
+public final class EspressoUtil {
+
+    private EspressoUtil() {
+        throw new AssertionError("No instances.");
+    }
+
+    public static Matcher<View> containsText(final CharSequence text) {
+        return new BoundedMatcher<View, TextView>(TextView.class) {
+            @Override
+            public void describeTo(Description description) {
+                description.appendText("contains text: " + text);
+            }
+
+            @Override
+            public boolean matchesSafely(TextView textView) {
+                return textView.getText().toString().contains(text);
+            }
+        };
+    }
+
+    public static Matcher<View> doesNotContainText(final CharSequence text) {
+        return new BoundedMatcher<View, TextView>(TextView.class) {
+            @Override
+            public void describeTo(Description description) {
+                description.appendText("does not contain text: " + text);
+            }
+
+            @Override
+            public boolean matchesSafely(TextView textView) {
+                return !textView.getText().toString().contains(text);
+            }
+        };
+    }
+
+    
+    public static Matcher<View> withTextIgnoreCase(@NonNull String text) {
+        return withTextIgnoreCase(is(text.toLowerCase()));
+    }
+
+    
+    public static Matcher<View> withTextIgnoreCase(@NonNull final Matcher<String> stringMatcher) {
+        return new BoundedMatcher<View, TextView>(TextView.class) {
+            @Override
+            public void describeTo(Description description) {
+                description.appendText("with text ignoring case: ");
+                stringMatcher.describeTo(description);
+            }
+
+            @Override
+            public boolean matchesSafely(TextView textView) {
+                return stringMatcher.matches(textView.getText().toString().toLowerCase());
+            }
+        };
+    }
+
+    @CheckResult
+    public static ViewAction focus() {
+        return new ViewAction() {
+            @Override
+            public Matcher<View> getConstraints() {
+                return isAssignableFrom(View.class);
+            }
+
+            @Override
+            public String getDescription() {
+                return "focusing ";
+            }
+
+            @Override
+            public void perform(UiController uiController, View view) {
+                view.requestFocus();
+            }
+        };
+    }
+
+    
+    public static Matcher<View> isDisabled() {
+        return new TypeSafeMatcher<View>() {
+            @Override
+            public void describeTo(Description description) {
+                description.appendText("is disabled");
+            }
+
+            @Override
+            public boolean matchesSafely(View view) {
+                return !view.isEnabled();
+            }
+        };
+    }
+
+    
+    @NonNull
+    public static Activity getCurrentActivity() {
+        return getFromUIThread(new GetterFunc<Activity>() {
+            @Override
+            public Activity get() {
+                Collection<Activity> activities
+                        = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED);
+                if (activities == null || activities.isEmpty()) {
+                    throw new RuntimeException("No active activities found!");
+                } else {
+                    return Iterables.getOnlyElement(activities);
+                }
+            }
+        });
+    }
+
+    
+    public static <T> T getFromUIThread(final GetterFunc<T> getter) {
+        if (Thread.currentThread() != InstrumentationRegistry.getTargetContext().getMainLooper().getThread()) {
+            final ParametrizedHolder<T> holder = new ParametrizedHolder<>();
+            InstrumentationRegistry.getInstrumentation().runOnMainSync(new Runnable() {
+                @Override
+                public void run() {
+                    holder.heldObject = getFromUIThread(getter);
+                }
+            });
+            return holder.heldObject;
+        } else {
+            return getter.get();
+        }
+    }
+
+    public static void assertInActivity(Class<? extends Activity> activityClass) {
+        Activity currentActivity = getCurrentActivity();
+        assertThat(currentActivity).isNotNull();
+        
+        assertThat(activityClass).isInstanceOf(currentActivity.getClass());
+    }
+
+    
+    public static void pressBackUntilActivity(@NonNull final Class<? extends Activity> activityClass) {
+        pressBackUntilCondition(new ConditionCheck() {
+            @Override
+            public boolean check() {
+                return getCurrentActivity().getClass().isAssignableFrom(activityClass);
+            }
+        });
+    }
+
+    
+    public static void pressBackUntilCondition(ConditionCheck conditionCheck) {
+        while (!conditionCheck.check()) {
+            pressBack();
+        }
+    }
+
+    public static void takeScreenshot(@Nullable Activity activity) {
+        if (activity == null) {
+            return;
+        }
+        String directoryPath = Environment.getExternalStorageDirectory().getAbsolutePath() + "/testingscreenshots/";
+        String fileName = "fail.png";
+
+        View srcView = activity.getWindow().getDecorView().getRootView();
+        srcView.setDrawingCacheEnabled(true);
+        Bitmap bitmap = Bitmap.createBitmap(srcView.getDrawingCache());
+        srcView.setDrawingCacheEnabled(false);
+
+        OutputStream out = null;
+        File dir = new File(directoryPath);
+        dir.mkdirs();
+        File imageFile = new File(dir, fileName);
+
+        
+        try {
+            boolean success = imageFile.createNewFile();
+            if (success) {
+                out = new FileOutputStream(imageFile);
+                bitmap.compress(Bitmap.CompressFormat.PNG, 90, out);
+                out.flush();
+            }
+        } catch (IOException ignored) {
+
+        } finally {
+            try {
+                if (out != null) {
+                    out.close();
+                }
+            } catch (Exception ignored) { }
+        }
+    }
+
+        // TODO
+
+
+    public static ViewAction waitForCondition(@NonNull final ConditionCheck conditionCheck,
+                                              final long millis) {
+        return new ViewAction() {
+
+            @Override
+            public Matcher<View> getConstraints() {
+                return isRoot();
+            }
+
+            @Override
+            public String getDescription() {
+                return "wait for a specific value that matches <matcher> during " + millis + " millis.";
+            }
+
+            @Override
+            public void perform(UiController uiController, View view) {
+                uiController.loopMainThreadUntilIdle();
+                final long startTime = SystemClock.elapsedRealtime();
+                final long endTime = startTime + millis;
+
+                do {
+                    if (conditionCheck.check()) {
+                        return;
+                    }
+                    uiController.loopMainThreadForAtLeast(50);
+                }
+                while (SystemClock.elapsedRealtime() <= endTime);
+
+                
+                throw new PerformException.Builder()
+                        .withActionDescription(getDescription())
+                        .withCause(new TimeoutException())
+                        .build();
+            }
+        };
+    }
+
+    
+    private static class ParametrizedHolder<T> {
+        private T heldObject = null;
+    }
+
+    
+    public interface GetterFunc<T> {
+
+        
+        T get();
+    }
+
+    public interface ConditionCheck {
+        boolean check();
+    }
+}

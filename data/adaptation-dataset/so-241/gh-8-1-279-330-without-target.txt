@@ -1,0 +1,247 @@
+
+
+package com.money.manager.ex.common;
+
+import android.os.Bundle;
+import android.os.Handler;
+import android.support.v4.app.Fragment;
+import android.view.ContextMenu;
+import android.view.ContextMenu.ContextMenuInfo;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.View.OnCreateContextMenuListener;
+import android.view.ViewGroup;
+import android.view.animation.AnimationUtils;
+import android.widget.AdapterView;
+import android.widget.ExpandableListAdapter;
+import android.widget.ExpandableListView;
+import android.widget.ListAdapter;
+import android.widget.ListView;
+import android.widget.ScrollView;
+import android.widget.TextView;
+
+import com.money.manager.ex.R;
+
+
+public class ExpandableListFragment
+        extends Fragment
+        implements OnCreateContextMenuListener, ExpandableListView.OnChildClickListener,
+        ExpandableListView.OnGroupCollapseListener, ExpandableListView.OnGroupExpandListener {
+
+    static final int INTERNAL_EMPTY_ID = 0x00ff0001;
+    static final int INTERNAL_LIST_CONTAINER_ID = 0x00ff0003;
+
+    final private Handler mHandler = new Handler();
+
+    final private Runnable mRequestFocus = new Runnable() {
+        public void run() {
+            mList.focusableViewAvailable(mList);
+        }
+    };
+
+    final private AdapterView.OnItemClickListener mOnClickListener = new AdapterView.OnItemClickListener() {
+        public void onItemClick(AdapterView<?> parent, View v, int position, long id) {
+            onListItemClick((ListView) parent, v, position, id);
+        }
+    };
+
+    ExpandableListAdapter mAdapter;
+    ExpandableListView mList;
+    View mEmptyView;
+    ScrollView mEmptyViewScroll;
+    TextView mStandardEmptyView;
+    CharSequence mEmptyText;
+    View mListContainer;
+    boolean mEmptyTextSet;
+    boolean mListShown;
+    boolean mFinishedStart = false;
+
+    public ExpandableListFragment() {
+    }
+
+    
+    @Override
+    public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+        return inflater.inflate(R.layout.expandable_list_fragment, container, false);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    }
+
+    
+    @Override
+    public void onViewCreated(View view, Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        ensureList();
+    }
+
+    
+    @Override
+    public void onDestroyView() {
+        mHandler.removeCallbacks(mRequestFocus);
+        mList = null;
+        super.onDestroyView();
+    }
+
+    
+    public void onListItemClick(ListView l, View v, int position, long id) {
+    }
+
+    
+    public void setListAdapter(ExpandableListAdapter adapter) {
+        boolean hadAdapter = mAdapter != null;
+        mAdapter = adapter;
+        if (mList != null) {
+            mList.setAdapter(adapter);
+            if (!mListShown && !hadAdapter) {
+                
+                
+                setListShown(true, getView().getWindowToken() != null);
+            }
+        }
+    }
+
+    
+    public void setSelection(int position) {
+        ensureList();
+        mList.setSelection(position);
+    }
+
+    public long getSelectedPosition() {
+        ensureList();
+        return mList.getSelectedPosition();
+    }
+
+    public long getSelectedId() {
+        ensureList();
+        return mList.getSelectedId();
+    }
+
+    public ExpandableListView getExpandableListView() {
+        ensureList();
+        return mList;
+    }
+
+    
+    public void setEmptyText(CharSequence text) {
+        ensureList();
+        if (mStandardEmptyView == null) {
+            throw new IllegalStateException("Can't be used with a custom content view");
+        }
+        mStandardEmptyView.setText(text);
+        if (mEmptyText == null) {
+            mList.setEmptyView(mEmptyViewScroll);
+        }
+        mEmptyText = text;
+
+
+
+
+
+    }
+
+    
+    public void setListShown(boolean shown) {
+        setListShown(shown, true);
+    }
+
+    
+    public void setListShownNoAnimation(boolean shown) {
+        setListShown(shown, false);
+    }
+
+    
+    private void setListShown(boolean shown, boolean animate) {
+        ensureList();
+        if (mListShown == shown) {
+            return;
+        }
+        mListShown = shown;
+        if (mListContainer != null) {
+            if (shown) {
+                if (animate) {
+                    mListContainer.startAnimation(AnimationUtils.loadAnimation(getActivity(), android.R.anim.fade_in));
+                }
+                mListContainer.setVisibility(View.VISIBLE);
+            } else {
+                if (animate) {
+                    mListContainer.startAnimation(AnimationUtils.loadAnimation(getActivity(), android.R.anim.fade_out));
+                }
+                mListContainer.setVisibility(View.GONE);
+            }
+        }
+    }
+
+    
+    public ExpandableListAdapter getExpandableListAdapter() {
+        return mAdapter;
+    }
+
+    // TODO
+
+
+    @Override
+    public void onGroupExpand(int arg0) {
+        
+
+    }
+
+    @Override
+    public void onGroupCollapse(int arg0) {
+        
+
+    }
+
+    @Override
+    public boolean onChildClick(ExpandableListView arg0, View arg1, int arg2, int arg3, long arg4) {
+        
+        return false;
+    }
+
+    @Override
+    public void onCreateContextMenu(ContextMenu menu, View v, ContextMenuInfo menuInfo) {
+    }
+
+    public void onContentChanged() {
+        View emptyView = getView().findViewById(android.R.id.empty);
+        mList = (ExpandableListView) getView().findViewById(android.R.id.list);
+        if (mList == null) {
+            throw new RuntimeException(
+                    "Your content must have a ExpandableListView whose id attribute is " + "'android.R.id.list'");
+        }
+        if (emptyView != null) {
+            mList.setEmptyView(emptyView);
+        }
+        mList.setOnChildClickListener(this);
+        mList.setOnGroupExpandListener(this);
+        mList.setOnGroupCollapseListener(this);
+
+        if (mFinishedStart) {
+            setListAdapter(mAdapter);
+        }
+        mFinishedStart = true;
+    }
+}

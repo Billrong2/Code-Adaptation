@@ -1,0 +1,244 @@
+
+
+package com.codebutler.farebot.fragment;
+
+
+
+import android.app.Fragment;
+import android.os.Bundle;
+import android.os.Handler;
+import android.view.ContextMenu;
+import android.view.ContextMenu.ContextMenuInfo;
+import android.view.Gravity;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.View.OnCreateContextMenuListener;
+import android.view.ViewGroup;
+import android.view.animation.AnimationUtils;
+import android.widget.AdapterView;
+import android.widget.ExpandableListAdapter;
+import android.widget.ExpandableListView;
+import android.widget.FrameLayout;
+import android.widget.ListView;
+import android.widget.TextView;
+
+import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
+
+@SuppressWarnings("WeakerAccess")
+public abstract class ExpandableListFragment extends Fragment implements OnCreateContextMenuListener,
+        ExpandableListView.OnChildClickListener, ExpandableListView.OnGroupCollapseListener,
+        ExpandableListView.OnGroupExpandListener {
+
+    private static final int INTERNAL_EMPTY_ID = 0x00ff0001;
+
+    private final Handler mHandler = new Handler();
+
+    private final Runnable mRequestFocus = new Runnable() {
+        @Override
+        public void run() {
+            mList.focusableViewAvailable(mList);
+        }
+    };
+
+    private final AdapterView.OnItemClickListener mOnClickListener = new AdapterView.OnItemClickListener() {
+        @Override
+        public void onItemClick(AdapterView<?> parent, View v, int position, long id) {
+            onListItemClick((ListView) parent, v, position, id);
+        }
+    };
+
+    private final ExpandableListView.OnChildClickListener mOnChildClickListener
+            = new ExpandableListView.OnChildClickListener() {
+        @Override
+        public boolean onChildClick(ExpandableListView parent, View v, int groupPosition, int childPosition, long id) {
+            return onListChildClick(parent, v, groupPosition, childPosition, id);
+        }
+    };
+
+    private ExpandableListAdapter mAdapter;
+    private ExpandableListView mList;
+    private View mEmptyView;
+    private TextView mStandardEmptyView;
+    private View mListContainer;
+    private boolean mSetEmptyText;
+    private boolean mListShown;
+    private boolean mFinishedStart = false;
+
+    protected ExpandableListFragment() { }
+
+    
+    @Override
+    @SuppressWarnings("ResourceType")
+    public View onCreateView(LayoutInflater inflater, ViewGroup container,
+                             Bundle savedInstanceState) {
+        FrameLayout root = new FrameLayout(getActivity());
+
+        TextView tv = new TextView(getActivity());
+        tv.setId(INTERNAL_EMPTY_ID);
+        tv.setGravity(Gravity.CENTER);
+        root.addView(tv, new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
+
+        ListView lv = new ExpandableListView(getActivity());
+        lv.setId(android.R.id.list);
+        lv.setDrawSelectorOnTop(false);
+        root.addView(lv, new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
+
+        root.setLayoutParams(new ListView.LayoutParams(MATCH_PARENT, MATCH_PARENT));
+
+        return root;
+    }
+
+    
+    @Override
+    public void onActivityCreated(Bundle savedInstanceState) {
+        super.onActivityCreated(savedInstanceState);
+        ensureList();
+    }
+
+    
+    @Override
+    public void onDestroyView() {
+        mHandler.removeCallbacks(mRequestFocus);
+        mList = null;
+        super.onDestroyView();
+    }
+
+    
+    private void onListItemClick(ListView l, View v, int position, long id) {
+    }
+
+    boolean onListChildClick(ExpandableListView parent, View v, int groupPosition, int childPosition, long id) {
+        return false;
+    }
+
+    
+    void setListAdapter(ExpandableListAdapter adapter) {
+        boolean hadAdapter = mAdapter != null;
+        mAdapter = adapter;
+        if (mList != null) {
+            mList.setAdapter(adapter);
+            if (!mListShown && !hadAdapter) {
+                
+                
+                setListShown(true, getView().getWindowToken() != null);
+            }
+        }
+    }
+
+    
+    public void setSelection(int position) {
+        ensureList();
+        mList.setSelection(position);
+    }
+
+    public long getSelectedPosition() {
+        ensureList();
+        return mList.getSelectedPosition();
+    }
+
+    public long getSelectedId() {
+        ensureList();
+        return mList.getSelectedId();
+    }
+
+    public ExpandableListView getExpandableListView() {
+        ensureList();
+        return mList;
+    }
+
+    
+    public void setEmptyText(CharSequence text) {
+        ensureList();
+        if (mStandardEmptyView == null) {
+            throw new IllegalStateException("Can't be used with a custom content view");
+        }
+        mStandardEmptyView.setText(text);
+        if (!mSetEmptyText) {
+            mList.setEmptyView(mStandardEmptyView);
+            mSetEmptyText = true;
+        }
+    }
+
+    
+    public void setListShown(boolean shown) {
+        setListShown(shown, true);
+    }
+
+    
+    private void setListShown(boolean shown, boolean animate) {
+        ensureList();
+        if (mListShown == shown) {
+            return;
+        }
+        mListShown = shown;
+        if (shown) {
+            if (animate) {
+                mListContainer.startAnimation(AnimationUtils.loadAnimation(
+                        getActivity(), android.R.anim.fade_in));
+            }
+            mListContainer.setVisibility(View.VISIBLE);
+        } else {
+            if (animate) {
+                mListContainer.startAnimation(AnimationUtils.loadAnimation(
+                        getActivity(), android.R.anim.fade_out));
+            }
+            mListContainer.setVisibility(View.GONE);
+        }
+    }
+
+    
+    public void setListShownNoAnimation(boolean shown) {
+        setListShown(shown, false);
+    }
+
+    
+    ExpandableListAdapter getExpandableListAdapter() {
+        return mAdapter;
+    }
+
+    // TODO
+
+
+    @Override
+    public void onGroupExpand(int arg0) {
+        
+
+    }
+
+    @Override
+    public void onGroupCollapse(int arg0) {
+        
+
+    }
+
+    @Override
+    public boolean onChildClick(ExpandableListView arg0, View arg1, int arg2,
+                                int arg3, long arg4) {
+        
+        return false;
+    }
+
+    @Override
+    public void onCreateContextMenu(ContextMenu menu, View v, ContextMenuInfo menuInfo) {
+    }
+
+    public void onContentChanged() {
+        View emptyView = getView().findViewById(android.R.id.empty);
+        mList = (ExpandableListView) getView().findViewById(android.R.id.list);
+        if (mList == null) {
+            throw new RuntimeException("Your content must have a ExpandableListView whose id attribute is "
+                    + "'android.R.id.list'");
+        }
+        if (emptyView != null) {
+            mList.setEmptyView(emptyView);
+        }
+        mList.setOnChildClickListener(this);
+        mList.setOnGroupExpandListener(this);
+        mList.setOnGroupCollapseListener(this);
+
+        if (mFinishedStart) {
+            setListAdapter(mAdapter);
+        }
+        mFinishedStart = true;
+    }
+}

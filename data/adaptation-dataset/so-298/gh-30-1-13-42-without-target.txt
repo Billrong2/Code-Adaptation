@@ -1,0 +1,20 @@
+package edu.cmu.cs.dickerson.kpd.helper;
+
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+
+public class MapUtil {
+
+
+		// TODO
+
+	
+	public static <K, V extends Comparable<? super V>> Map<K, V> sortByValue( Map<K, V> map) {
+		return sortByValue(map, false);
+	}
+
+}

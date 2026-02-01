@@ -1,0 +1,85 @@
+package com.designatednerd.wino.ui;
+
+import android.support.annotation.IdRes;
+import android.support.annotation.StringRes;
+import android.support.test.espresso.ViewInteraction;
+import android.support.v7.widget.RecyclerView;
+import android.view.View;
+import android.view.ViewGroup;
+
+import org.hamcrest.Description;
+import org.hamcrest.Matcher;
+import org.hamcrest.TypeSafeMatcher;
+
+import static android.support.test.espresso.Espresso.onView;
+import static android.support.test.espresso.action.ViewActions.*;
+import static android.support.test.espresso.matcher.ViewMatchers.*;
+
+import static org.hamcrest.CoreMatchers.allOf;
+
+public class EspressoHelpers {
+
+    
+
+    public static void enterTextIntoViewWithHint(String aTextToEnter, @StringRes int aHintResID) {
+        onView(withHint(aHintResID)).perform(typeText(aTextToEnter));
+    }
+
+    public static void enterTextIntoViewWithID(String aTextToEnter, @IdRes int aViewID) {
+        onView(withId(aViewID)).perform(typeText(aTextToEnter));
+    }
+
+    
+
+    public static void scrollToViewWithID(@IdRes int aViewIDRes) {
+        onView(withId(aViewIDRes)).perform(scrollTo());
+    }
+
+    
+
+    public static void tapViewWithText(String aText) {
+        onView(withText(aText)).perform(click());
+    }
+
+    public static void tapViewWithText(@StringRes int aTextResID) {
+        onView(withText(aTextResID)).perform(click());
+    }
+
+    public static void tapViewWithID(@IdRes int aViewResID) {
+        onView(withId(aViewResID)).perform(click());
+    }
+
+    
+
+    public static Matcher<View> withRecyclerView(@IdRes int viewId) {
+        return allOf(isAssignableFrom(RecyclerView.class), withId(viewId));
+    }
+
+
+    
+
+    
+    public static ViewInteraction onRecyclerItemViewWithTitle(@IdRes int aParentRecyclerViewID,
+                                                              @IdRes int aRecyclerViewTextViewID,
+                                                              String title) {
+
+        Matcher<View> hasRecyclerViewAsParent = withParent(withRecyclerView(aParentRecyclerViewID));
+        Matcher<View> hasChildWithTitleInTextView = withChild(allOf(withId(aRecyclerViewTextViewID), withText(title)));
+        Matcher<View> hasChildWithChildWithTitleInTextView = withChild(hasChildWithTitleInTextView);
+
+        return onView(allOf(hasRecyclerViewAsParent,
+                hasChildWithChildWithTitleInTextView));
+
+    }
+
+        // TODO
+
+
+    
+    public static ViewInteraction onRecyclerItemViewAtPosition(@IdRes int aParentRecyclerViewID,
+                                                               int aPosition) {
+
+
+        return onView(nthChildOf(withRecyclerView(aParentRecyclerViewID), aPosition));
+    }
+}

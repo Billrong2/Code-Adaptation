@@ -1,0 +1,335 @@
+package org.myrobotlab.service;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLDecoder;
+import java.text.ParseException;
+import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.HashSet;
+import java.util.List;
+
+import org.apache.commons.io.IOUtils;
+import org.junit.Assert;
+import org.junit.Test;
+import org.myrobotlab.framework.ServiceType;
+import org.myrobotlab.framework.repo.ServiceData;
+import org.myrobotlab.logging.LoggerFactory;
+import org.myrobotlab.service.interfaces.ServiceInterface;
+import org.slf4j.Logger;
+
+public class ServiceInterfaceTest {
+
+  public final static Logger log = LoggerFactory.getLogger(ServiceInterfaceTest.class);
+
+  @Test
+  public final void testInstallAllServices() throws ClassNotFoundException, ParseException, IOException {
+    
+
+    ServiceData sd = ServiceData.getLocalInstance();
+                                                    
+                                                    
+    for (ServiceType st : sd.getServiceTypes()) {
+      if (!st.isAvailable()) {
+        log.info("Installing Service:" + st.getName());
+        Runtime.install(st.getName());
+      } else {
+        log.info("already installed.");
+      }
+    }
+
+  }
+
+  @Test
+  public final void testAllServices() throws ClassNotFoundException {
+
+    ArrayList<String> servicesWithoutWebPages = new ArrayList<String>();
+    ArrayList<String> servicesWithoutScripts = new ArrayList<String>();
+    ArrayList<String> servicesThatDontStartProperly = new ArrayList<String>();
+
+    ArrayList<String> servicesNotInServiceDataJson = new ArrayList<String>();
+
+    HashSet<String> whiteListServices = new HashSet<String>();
+    
+    
+    whiteListServices.add("Cli");
+    
+    whiteListServices.add("GUIService");
+    
+    whiteListServices.add("LeapMotion");
+    
+    whiteListServices.add("OculusRift");
+    
+    whiteListServices.add("Plantoid");
+    
+    whiteListServices.add("Shoutbox");
+    
+    whiteListServices.add("SLAMBad");
+    
+    whiteListServices.add("WebGui");
+
+    
+    whiteListServices.add("MyoThalmic");
+    
+    whiteListServices.add("Tracking");
+
+    
+    whiteListServices.add("EddieControlBoard");
+    
+    whiteListServices.add("GPS");
+    
+    whiteListServices.add("Lidar");
+    
+    whiteListServices.add("PickToLight");
+    
+    whiteListServices.add("Sabertooth");
+    
+    whiteListServices.add("VirtualDevice");
+    whiteListServices.add("OpenNI");
+
+    
+    Python python = (Python) Runtime.createAndStart("python", "Python");
+    String testScriptDirectory = "./src/resource/Python/examples/";
+    List<String> servicesToTest = listAllServices();
+    
+    
+
+    
+
+    
+    ServiceData sd = ServiceData.getLocalInstance();
+
+    int numServices = servicesToTest.size();
+    int numServicePages = 0;
+    int numScripts = 0;
+    int numScriptsWorky = 0;
+    int numStartable = 0;
+    log.info("----------------------------------------------");
+    for (String service : servicesToTest) {
+      System.out.println("SYSTEM TESTING " + service);
+      System.out.flush();
+      if (whiteListServices.contains(service)) {
+        log.info("White listed testing of service {}", service);
+        continue;
+      }
+      log.info("Testing Service: {}", service);
+
+      ServiceType st = sd.getServiceType("org.myrobotlab.service." + service);
+      if (st == null) {
+        System.out.println("NO SERVICE TYPE FOUND!");
+        servicesNotInServiceDataJson.add(service);
+      } else {
+        System.out.println("Service Type Found!");
+      }
+      
+      
+      
+      
+      
+      
+      
+
+      
+      if (serviceHasWebPage(service)) {
+        log.info("Service {} has a web page..", service);
+        numServicePages++;
+      } else {
+        log.warn("Service {} does not have a web page..", service);
+        servicesWithoutWebPages.add(service);
+      }
+
+      if ("Gps".equals(service)) {
+        log.info("here");
+      }
+
+      if (serviceInterfaceTest(service)) {
+        numStartable++;
+      } else {
+        servicesThatDontStartProperly.add(service);
+      }
+
+      
+      File script = new File(testScriptDirectory + service + ".py");
+      if (script.exists()) {
+        log.info("Service Has a Script: {}", service);
+        numScripts++;
+      } else {
+        log.warn("Missing Script for Service {}", service);
+        servicesWithoutScripts.add(service);
+      }
+
+      
+      if (testServiceScript(python, testScriptDirectory, service)) {
+        
+        numScriptsWorky++;
+      } else {
+        
+        
+      }
+      
+      log.info("----------------------------------------------");
+      
+      
+      
+      
+      
+      
+      
+
+    }
+
+    log.info("----------------------------------------------");
+    log.info("Service Report");
+    log.info("Number of Services:           {}", numServices);
+    log.info("Number of Startable Services: {}", numStartable);
+    log.info("Number of Services Pages      {}", numServicePages);
+    log.info("Number of Scripts:            {}", numScripts);
+    log.info("Number of Scripts Worky:      {}", numScriptsWorky);
+    log.info("----------------------------------------------");
+
+    for (String s : servicesThatDontStartProperly) {
+      log.info("FAILED ON START:" + s);
+    }
+
+    for (String s : servicesWithoutWebPages) {
+      log.info("NO WEB PAGE    :" + s);
+    }
+
+    for (String s : servicesWithoutScripts) {
+      log.info("NO SCRIPT      :" + s);
+    }
+
+    for (String s : servicesNotInServiceDataJson) {
+      log.info("NOT IN SERVICE DATA :" + s);
+    }
+
+    log.info("Done...");
+
+  }
+
+  private boolean serviceInterfaceTest(String service) {
+    
+
+    ServiceInterface foo = Runtime.create(service.toLowerCase(), service);
+    if (foo == null) {
+      log.warn("Runtime Create returned a null service for {}", service);
+      return false;
+    }
+    System.out.println("Service Test:" + service);
+    System.out.flush();
+    
+    Assert.assertNotNull(foo.getDescription());
+    Assert.assertNotNull(foo.getName());
+    Assert.assertNotNull(foo.getSimpleName());
+    Assert.assertNotNull(foo.getType());
+
+    
+    foo.startService();
+    foo.stopService();
+    foo.releaseService();
+
+    foo.startService();
+    foo.save();
+    foo.load();
+    foo.stopService();
+
+    return true;
+  }
+
+  private boolean testServiceScript(Python python, String testScriptDirectory, String service) {
+
+    
+
+    String testScriptFile = testScriptDirectory + service + ".py";
+    File script = new File(testScriptFile);
+    if (!script.exists()) {
+      log.warn("No default script for Service {}", script);
+      return false;
+    } else {
+      log.info("Default Script Exists for {}", service);
+    }
+
+    return false;
+
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+  }
+
+  private boolean serviceHasWebPage(String service) {
+    String url = "http://www.myrobotlab.org/service/" + service;
+    InputStream in = null;
+    try {
+      in = new URL(url).openStream();
+    } catch (MalformedURLException e) {
+      
+      
+      return false;
+    } catch (IOException e) {
+      
+      
+      return false;
+    }
+
+    try {
+      
+      IOUtils.toString(in);
+    } catch (IOException e) {
+      
+      return false;
+    } finally {
+      IOUtils.closeQuietly(in);
+    }
+    return true;
+  }
+
+  public static List<String> listAllServices() throws ClassNotFoundException {
+    
+    List<Class<?>> classes = ServiceInterfaceTest.getClassesForPackage("org.myrobotlab.service");
+    List<String> services = new ArrayList<String>();
+    for (Class<?> c : classes) {
+      
+      HashSet<String> superClasses = new HashSet<String>();
+      Class x = c;
+      while (true) {
+        if (x.getSuperclass() != null) {
+          superClasses.add(x.getSuperclass().toString());
+          x = x.getSuperclass();
+        } else {
+          break;
+        }
+
+      }
+      if (superClasses.contains("class org.myrobotlab.framework.Service")) {
+        
+        String[] parts = c.toString().split(" ")[1].split("\\.");
+        services.add(parts[parts.length - 1]);
+        
+      }
+    }
+    return services;
+  }
+
+    // TODO
+
+
+}

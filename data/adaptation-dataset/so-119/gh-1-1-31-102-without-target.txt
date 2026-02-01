@@ -1,0 +1,37 @@
+package ui;
+
+import java.awt.Component;
+import java.awt.Graphics;
+import java.awt.Image;
+import java.awt.Point;
+import java.awt.Rectangle;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseMotionAdapter;
+import java.awt.image.BufferedImage;
+
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JTabbedPane;
+
+
+public class DraggableTabbedPane extends JTabbedPane {
+
+	private boolean dragging = false;
+	private Image tabImage = null;
+	private Point currentMouseLocation = null;
+	private int draggedTabIndex = 0;
+
+	// TODO
+
+
+	protected void paintComponent(Graphics g) {
+		super.paintComponent(g);
+
+		
+		if(dragging && currentMouseLocation != null && tabImage != null) {
+			
+			g.drawImage(tabImage, currentMouseLocation.x, currentMouseLocation.y, this);
+		}
+	}
+}

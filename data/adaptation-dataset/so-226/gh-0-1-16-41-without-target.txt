@@ -1,0 +1,22 @@
+package uk.org.smithfamily.mslogger.widgets;
+
+import java.util.Set;
+
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
+import android.content.Context;
+import android.preference.ListPreference;
+import android.util.AttributeSet;
+
+
+public class BluetoothDevicePreference extends ListPreference
+{
+        // TODO
+
+
+    
+    public BluetoothDevicePreference(Context context)
+    {
+        this(context, null);
+    }
+}

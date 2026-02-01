@@ -1,0 +1,19 @@
+package com.lnikkila.oidc.minsdkcompat;
+
+import android.annotation.TargetApi;
+import android.net.Uri;
+import android.os.Build;
+
+import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.Set;
+
+
+public class CompatUri {
+    
+    private static final String NOT_HIERARCHICAL
+            = "This isn't a hierarchical URI.";
+
+        // TODO
+
+}

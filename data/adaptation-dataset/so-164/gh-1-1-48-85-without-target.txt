@@ -1,0 +1,51 @@
+package org.droidplanner.android.helpers;
+
+import java.io.ByteArrayOutputStream;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.util.Locale;
+
+import org.droidplanner.android.utils.file.DirectoryPath;
+import org.droidplanner.android.utils.file.FileStream;
+
+import com.google.android.gms.maps.model.Tile;
+import com.google.android.gms.maps.model.TileProvider;
+
+
+public class LocalMapTileProvider implements TileProvider {
+	private static final int TILE_WIDTH = 256;
+	private static final int TILE_HEIGHT = 256;
+	private static final int BUFFER_SIZE = 16 * 1024;
+
+	public LocalMapTileProvider() {
+		tryToAddANoMediaFile();
+	}
+
+	private void tryToAddANoMediaFile() {
+		try {
+			FileStream.createNoMediaFile();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	@Override
+	public Tile getTile(int x, int y, int zoom) {
+		byte[] image = readTileImage(x, y, zoom);
+		if (image == null) {
+			return NO_TILE;
+		} else {
+			return new Tile(TILE_WIDTH, TILE_HEIGHT, image);
+		}
+
+	}
+
+	// TODO
+
+
+	private String getTileFilename(int x, int y, int zoom) {
+		return String.format(Locale.US, "%d/%d/%d.jpg", zoom, y, x);
+	}
+
+}

@@ -1,0 +1,23 @@
+
+
+
+
+package com.pheelicks.utils;
+
+import java.lang.reflect.Method;
+
+import android.content.Context;
+import android.util.Log;
+
+public class SystemPropertiesProxy {
+  private static final String TAG = "SystemPropertiesProxy";
+
+  
+  public static Boolean getBoolean(Context context, String key, boolean def)
+      throws IllegalArgumentException {
+    return getBoolean(context.getClassLoader(), key, def);
+  }
+
+  // TODO
+
+}

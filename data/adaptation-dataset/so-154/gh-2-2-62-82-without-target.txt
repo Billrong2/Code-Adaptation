@@ -1,0 +1,40 @@
+
+
+package org.hawkular.apm.client.api.sampler;
+
+import java.util.BitSet;
+import java.util.Random;
+
+import org.hawkular.apm.api.model.trace.Trace;
+
+
+public class PercentageSampler implements Sampler {
+
+    private BitSet bitSet;
+    private int i;
+
+    protected PercentageSampler(int percentage) {
+        bitSet = randomBitSet(100, percentage, new Random());
+    }
+
+    
+    public static Sampler withPercentage(int percentage) {
+        if (percentage <= 0) {
+            return Sampler.NEVER_SAMPLE;
+        } else if (percentage >= 100) {
+            return Sampler.ALWAYS_SAMPLE;
+        }
+
+        return new PercentageSampler(percentage);
+    }
+
+    @Override
+    public synchronized boolean isSampled(Trace trace) {
+        boolean sample = bitSet.get(i++);
+        i = i == 100 ? 0 : i;
+        return sample;
+    }
+
+        // TODO
+
+}

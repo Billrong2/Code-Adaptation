@@ -1,0 +1,15 @@
+package io.prometheus.client.matchers;
+
+import org.hamcrest.Description;
+import org.hamcrest.Matcher;
+import org.hamcrest.core.IsCollectionContaining;
+
+
+public final class CustomMatchers {
+
+  private CustomMatchers() {
+  }
+
+  // TODO
+
+}

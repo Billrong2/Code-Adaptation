@@ -1,0 +1,159 @@
+package com.digitalblacksmith.tango_ar_videocapture;
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.IntBuffer;
+
+import javax.microedition.khronos.egl.EGLConfig;
+import javax.microedition.khronos.opengles.GL10;
+
+import android.graphics.Bitmap;
+import android.graphics.Bitmap.CompressFormat;
+import android.opengl.GLES20;
+import android.opengl.GLException;
+import android.opengl.GLSurfaceView;
+import android.os.AsyncTask;
+import android.os.Environment;
+import android.util.Log;
+
+
+public class ScreenGrabRenderer implements GLSurfaceView.Renderer  {
+
+	TangoCameraScreengrabCallback mTangoCameraScreengrabCallback;
+
+	ReadableTangoCameraPreview readableTangoCameraPreview; 
+
+	GLSurfaceView.Renderer tangoCameraRenderer;
+	private static final String TAG = ScreenGrabRenderer.class.getSimpleName();
+
+	IntBuffer intBuffer;
+
+
+	boolean grabNextScreen = false;
+
+	int grabX = 0;
+	int grabY = 0;
+	int grabWidth = 640;
+	int grabHeight = 320;
+
+	public void setTangoCameraScreengrabCallback(TangoCameraScreengrabCallback aTangoCameraScreengrabCallback) {
+		mTangoCameraScreengrabCallback = aTangoCameraScreengrabCallback;
+	}
+
+	
+	public void grabNextScreen(int x, int y, int w, int h, IntBuffer aIntBuffer) {
+		grabNextScreen = true;
+		grabX=x;
+		grabY=y;
+		grabWidth=w;
+		grabHeight=h;
+		intBuffer = aIntBuffer;
+		intBuffer.position(0);
+	}
+
+	@Override
+	public void onSurfaceCreated(GL10 gl, EGLConfig config) {
+		tangoCameraRenderer.onSurfaceCreated(gl, config);
+
+	}
+
+	@Override
+	public void onSurfaceChanged(GL10 gl, int width, int height) {
+		tangoCameraRenderer.onSurfaceChanged(gl, width, height);		
+	}
+
+	@Override
+	public void onDrawFrame(final GL10 gl) {
+		tangoCameraRenderer.onDrawFrame(gl);	
+		if(grabNextScreen) {
+			readableTangoCameraPreview.queueEvent(new Runnable() {
+				@Override
+				public void run() {
+					
+
+					mTangoCameraScreengrabCallback.newPhotoBuffer(grabWidth, grabHeight);
+
+					if(copyBackBuffer(grabX,grabY,grabWidth,grabHeight,gl)) {
+						if(mTangoCameraScreengrabCallback != null) {
+							mTangoCameraScreengrabCallback.newPhotoBuffer(grabWidth, grabHeight);
+						} else {
+							Log.i(TAG, "Callback not set properly..");
+						}
+					}
+				}
+			});
+			grabNextScreen=false;
+		}
+	}
+
+	private boolean copyBackBuffer(int x, int y, int w, int h, GL10 gl) {		
+		try {
+			GLES20.glReadPixels(x, y, w, h,
+					GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, intBuffer);
+			
+			return true;
+		} catch (GLException e) {
+			Log.e(TAG,e.toString());			
+		}		
+		return false;
+	}
+
+		// TODO
+
+
+
+	
+	private void screenGrab(GL10 gl) {
+		long fileprefix = System.currentTimeMillis();
+		String targetPath =Environment.getExternalStorageDirectory()  + "/RavenEye/Photos/";
+		String imageFileName = fileprefix + ".png";   
+		String fullPath = "error";
+
+		Bitmap image = createBitmapFromGLSurface(grabX,grabY,grabWidth,grabHeight,gl);
+		fullPath =targetPath + imageFileName;
+		
+
+		if(!(new File(targetPath)).exists()) {
+			new File(targetPath).mkdirs();
+		}
+		try {           
+			File targetDirectory = new File(targetPath);
+			File photo=new File(targetDirectory, imageFileName);
+			FileOutputStream fos=new FileOutputStream(photo.getPath());
+			image.compress(CompressFormat.PNG, 10, fos);          
+			fos.flush();
+			fos.close();
+
+			Log.i(TAG, "Grabbed an image in target path:" + fullPath);		
+
+			
+			if(mTangoCameraScreengrabCallback != null) {
+				
+			} else {
+				Log.i(TAG, "Callback not set properly..");
+			}
+
+		} catch (FileNotFoundException e) {
+			Log.e(TAG,"Exception " + e);
+			e.printStackTrace();
+		} catch (IOException e) {
+			Log.e(TAG,"Exception " + e);
+			e.printStackTrace();
+		}   
+
+
+	}
+
+
+	
+	public ScreenGrabRenderer(ReadableTangoCameraPreview tangoPreview, GLSurfaceView.Renderer baseRenderer) {
+		tangoCameraRenderer = baseRenderer;
+		readableTangoCameraPreview= tangoPreview;
+	}
+
+
+}

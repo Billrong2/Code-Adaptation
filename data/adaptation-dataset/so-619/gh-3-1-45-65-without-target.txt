@@ -1,0 +1,40 @@
+
+
+package eu.darken.myolib;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+
+public class AdRecord {
+    private final int mLength;
+    private final int mType;
+    private final byte[] mData;
+
+    public AdRecord(int length, int type, byte[] data) {
+        mLength = length;
+        mType = type;
+        mData = data;
+    }
+
+    public int getLength() {
+        return mLength;
+    }
+
+    public int getType() {
+        return mType;
+    }
+
+    public byte[] getData() {
+        return mData;
+    }
+
+    @Override
+    public String toString() {
+        return "AdRecord: length:" + mLength + ", type:" + mType + ", data:" + Arrays.toString(mData);
+    }
+
+    // TODO
+
+}

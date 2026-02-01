@@ -1,0 +1,151 @@
+
+
+package org.redstonechips.parsing;
+
+import java.text.DecimalFormat;
+import java.util.regex.Pattern;
+
+
+
+public class Parsing {
+    public final static Pattern NUMBER_PATTERN = Pattern.compile("^[-+]?\\d*\\.?\\d*");
+    public final static Pattern INTEGER_PATTERN = Pattern.compile("^[-+]?\\d*");
+    public final static Pattern SYMBOLNAME_PATTERN = Pattern.compile("^[a-zA-Z_][a-zA-Z0-9_$]*$");
+    public final static Pattern notePattern = Pattern.compile("\\@[^@]*\\@");
+    public final static Pattern unitsPattern = Pattern.compile("\\:[^:]*\\:");
+
+    public final static DecimalFormat floatFormat = new DecimalFormat(".##");
+    public final static DecimalFormat intFormat = new DecimalFormat("#");
+
+    public static boolean checkNesting(String str, char open, char close) {
+        return (str.charAt(0)==open) && (Tokenizer.balanced(str, 0, open, close)==str.length()-1);
+    }
+
+    public static String fillString(String fill, int length) {
+        String ret = "";
+        while (ret.length()<length) {
+            ret += fill;
+        }
+        return ret.substring(0, length);
+    }
+
+    
+    public static boolean isNumber(String value) {
+        return (NUMBER_PATTERN.matcher(value).matches());
+    }
+    
+    
+    public static boolean isInt(String value) {
+        return (INTEGER_PATTERN.matcher(value).matches());
+    }
+    
+    
+    public static boolean isNested(String str, int index, String openBalance, String closeBalance) throws IllegalArgumentException {
+        if (index==0) return false; 
+        char[] openers = openBalance.toCharArray();
+        char[] closers = closeBalance.toCharArray();
+        if (closers.length!=openers.length) throw new IllegalArgumentException("There must be the same number of balance opener and balance closer characters.");
+        for (int i=0; i<openers.length; i++) {
+            
+            int count = 0;
+            for (int x=0; x<index; x++) {
+                if (str.charAt(x)==openers[i]) count++;
+                else if (str.charAt(x)==closers[i]) count--;
+            }
+            if (closers[i]==openers[i]) {
+                if (count%2!=0) return true;
+            } else if (count!=0) return true;
+        }
+        return false;
+    }
+    
+    public static int indexOfUnnested(String str, char chr, String openBalance, String closeBalance) {
+        return indexOfUnnested(str, chr, 0, openBalance, closeBalance);
+    }
+    
+    public static int indexOfUnnested(String str, char chr, int fromIdx, String openBalance, String closeBalance) throws IllegalArgumentException {
+        int idx = fromIdx-1; boolean nested;
+        do {
+           idx = str.indexOf(chr, idx+1);
+           if (idx==-1) return -1;
+           else
+               nested = isNested(str, idx, openBalance, closeBalance);
+       } while (nested);
+       return idx;
+    }
+    
+    public static int lastIndexOfUnnested(String str, char chr, String openBalance, String closeBalance) throws IllegalArgumentException {
+        return lastIndexOfUnnested(str, chr, str.length()-1, openBalance, closeBalance);
+    }
+    
+    public static int lastIndexOfUnnested(String str, char chr, int fromIdx, String openBalance, String closeBalance) throws IllegalArgumentException {
+        int idx = fromIdx+1; boolean nested;
+        do {
+            idx = str.lastIndexOf(chr, idx-1);
+            if (idx==-1) return -1;
+            else 
+                nested = isNested(str, idx, openBalance, closeBalance);
+        } while (nested);
+        return idx;
+    }
+    
+    public static String parseEscapeCharacters(String str) {
+        return str.replaceAll("\\$gt\\.", ">")
+            .replaceAll("\\$lt\\.", "<")
+            .replaceAll("\\$amp\\.", "&")
+            .replaceAll("\\$sc\\.", ";")
+            .replaceAll("\\$eq\\.","=")
+            .replaceAll("\\$com\\.", ",")
+            .replaceAll("\\$apos\\.", "'")
+            .replaceAll("\\$curl-open\\.", "{")
+            .replaceAll("\\$curl-close\\.", "}")
+            .replaceAll("\\$under\\.", "_")
+            .replaceAll("\\$tab\\.", "\t")
+            .replaceAll("\\$nline\\.", System.getProperty("line.separator"));
+    }
+
+    private final static int COLUMNS = 80;
+    
+    public static String makeCaption(String message) {
+        int eqCount = COLUMNS - message.length();
+        String out = "";
+        if (eqCount>=2) {
+            for (int i=0; i<(int)(eqCount/2); i++) 
+                out += "=";
+        } out += message.toUpperCase();
+        int l = out.length();
+        for (int i=0; i<(COLUMNS-l); i++)
+            out += "=";
+        return "\n" + out + "\n";
+    }
+    
+    public static String makeDots(String message, int tab) {
+        int columns = COLUMNS - tab;
+        if (message.length()>columns)
+            return "..." + message.substring(message.length()-(columns-4));
+        else return message;
+    }
+    
+    public static String arrayToString(String[] args, String delimiter) {
+        StringBuilder b = new StringBuilder();
+        for (String arg : args) { b.append(arg); b.append(delimiter); }
+
+        return b.substring(0, b.length()-delimiter.length());
+    }
+
+        // TODO
+
+    
+    public static String indexToOrdinal(int idx) {
+        int ord = idx+1;
+        
+        switch (idx) {
+            case 0: return "1st";
+            case 1: return "2nd";
+            case 2: return "3rd";
+            default: return ord + "th";
+        }
+                        
+                    
+    }
+}

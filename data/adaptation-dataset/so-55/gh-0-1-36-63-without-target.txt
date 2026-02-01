@@ -1,0 +1,18 @@
+
+
+package net.instantcom.mm7;
+
+import java.io.InputStream;
+
+import net.instantcom.mm7.Address.RecipientType;
+
+
+public class Stackoverflow12373722 {
+
+	private static InputStream load(String file) {
+		return Stackoverflow12373722.class.getResourceAsStream(file);
+	}
+
+	// TODO
+
+}

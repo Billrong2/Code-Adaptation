@@ -1,0 +1,28 @@
+package presentation.gui.desktop;
+
+import javax.swing.*;
+import java.awt.*;
+
+
+public class BoundedDesktopManager extends DefaultDesktopManager {
+
+    @Override
+    public void beginDraggingFrame(JComponent f) {
+        
+    }
+
+    @Override
+    public void beginResizingFrame(JComponent f, int direction) {
+        
+    }
+
+    // TODO
+
+
+    protected boolean inBounds(JInternalFrame f, int newX, int newY, int newWidth, int newHeight) {
+        if (newX < 0 || newY < 0) return false;
+        if (newX + newWidth > f.getDesktopPane().getWidth()) return false;
+        if (newY + newHeight > f.getDesktopPane().getHeight()) return false;
+        return true;
+    }
+}

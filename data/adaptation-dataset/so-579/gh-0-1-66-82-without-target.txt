@@ -1,0 +1,179 @@
+package info.guardianproject.otr.app.im.plugin.xmpp.auth;
+
+
+import java.io.IOException;
+import java.net.URLEncoder;
+
+import org.apache.commons.codec.binary.Base64;
+import org.apache.harmony.javax.security.auth.callback.CallbackHandler;
+import org.jivesoftware.smack.SASLAuthentication;
+import org.jivesoftware.smack.XMPPException;
+import org.jivesoftware.smack.packet.Packet;
+import org.jivesoftware.smack.sasl.SASLMechanism;
+
+import android.accounts.Account;
+import android.accounts.AccountManager;
+import android.accounts.AccountManagerCallback;
+import android.accounts.AccountManagerFuture;
+import android.accounts.AuthenticatorException;
+import android.accounts.OperationCanceledException;
+import android.app.Activity;
+import android.content.Context;
+import android.os.Bundle;
+import android.os.Handler;
+import android.util.Log;
+
+
+public class GTalkOAuth2 extends SASLMechanism {
+
+public static final String NAME="X-GOOGLE-TOKEN";
+private static final String TOKEN_TYPE = "mail";
+public static final String TYPE_GOOGLE_ACCT = "com.google";
+
+
+public GTalkOAuth2(SASLAuthentication saslAuthentication) {
+    super(saslAuthentication);
+}
+
+@Override
+protected String getName() {
+    return NAME;
+}
+
+static void enable() {
+
+      
+}
+
+@Override
+public void authenticate(String arg0, String arg1, CallbackHandler arg2) throws IOException,
+        XMPPException {
+    super.authenticate(arg0, arg1, arg2);
+}
+
+@Override
+public void authenticate(String arg0, String arg1, String arg2) throws IOException, XMPPException {
+    super.authenticate(arg0, arg1, arg2);
+}
+
+@Override
+public void challengeReceived(String arg0) throws IOException {
+    super.challengeReceived(arg0);
+}
+
+// TODO
+
+
+
+public static String getGoogleAuthTokenAllow(String name, Context context, Activity activity, Handler handler)
+{
+    AccountManager aMgr = AccountManager.get(context);
+
+    String retVal = null;
+    Account account = getAccount(TYPE_GOOGLE_ACCT,name, aMgr);
+    Bundle bundle = new Bundle();
+
+    AccountManagerFuture<Bundle> accFut = aMgr.getAuthToken(account, TOKEN_TYPE, bundle, activity,
+            new AccountManagerCallback<Bundle>() {
+
+                @Override
+                public void run(AccountManagerFuture<Bundle> bundle) {
+
+                    
+
+
+                }} ,handler);
+
+    try
+    {
+        Bundle authTokenBundle = accFut.getResult();
+        retVal = authTokenBundle.get(AccountManager.KEY_AUTHTOKEN).toString();
+    }
+    catch (Exception e)
+    {
+        Log.e(NAME,"error getting auth token result",e);
+    }
+    return retVal;
+}
+
+
+public static String getGoogleAuthToken(String accountName, Context context) {
+ 
+    String authTokenType = TOKEN_TYPE;
+    AccountManager aMgr = AccountManager.get(context);
+    Account account = getAccount(TYPE_GOOGLE_ACCT,accountName,aMgr);
+    if (accountName == null)
+        accountName = account.name;
+
+    if (account != null) {
+      try {
+
+          
+
+        return aMgr.blockingGetAuthToken(account, authTokenType, true);
+      } catch (OperationCanceledException e) {
+        Log.e(NAME, "auth canceled", e);
+      } catch (IOException e) {
+        Log.e(NAME, "auth io problem", e);
+      } catch (AuthenticatorException e) {
+        Log.e(NAME, "auth authenticator exc", e);
+      }
+    }
+    return null;
+  }
+
+
+
+
+public static Account getAccount(String type, String name, AccountManager aMgr) {
+    Account[] accounts = aMgr.getAccountsByType(type);
+
+    if (name == null)
+        return accounts[0];
+
+    for (Account account : accounts) {
+      if (account.name.equals(name)) {
+        return account;
+      }
+    }
+    return null;
+  }
+
+public class Auth2Mechanism extends Packet {
+    String stanza;
+    public Auth2Mechanism(String txt) {
+        stanza = txt;
+    }
+    public String toXML() {
+        return stanza;
+    }
+}
+
+
+public class AuthMechanism extends Packet {
+    final private String name;
+    final private String authenticationText;
+
+    public AuthMechanism(String name, String authenticationText) {
+        if (name == null) {
+            throw new NullPointerException("SASL mechanism name shouldn't be null.");
+        }
+        this.name = name;
+        this.authenticationText = authenticationText;
+    }
+
+    public String toXML() {
+        StringBuilder stanza = new StringBuilder();
+        stanza.append("<auth mechanism=\"").append(name);
+        stanza.append("\" xmlns=\"urn:ietf:params:xml:ns:xmpp-sasl\">");
+        if (authenticationText != null &&
+                authenticationText.trim().length() > 0) {
+            stanza.append(authenticationText);
+        }
+        stanza.append("</auth>");
+        return stanza.toString();
+    }
+    }
+}
+
+

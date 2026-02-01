@@ -1,0 +1,120 @@
+package org.kohsuke.github;
+
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.lang.reflect.Field;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Iterators;
+import org.junit.Test;
+
+import static org.hamcrest.CoreMatchers.notNullValue;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.when;
+
+
+public class GitHubTest {
+    @Test
+    public void testOffline() throws Exception {
+        GitHub hub = GitHub.offline();
+        assertEquals("https://api.github.invalid/test", hub.getApiURL("/test").toString());
+        assertTrue(hub.isAnonymous());
+        try {
+            hub.getRateLimit();
+            fail("Offline instance should always fail");
+        } catch (IOException e) {
+            assertEquals("Offline", e.getMessage());
+        }
+    }
+
+    @Test
+    public void testGitHubServerWithHttp() throws Exception {
+        GitHub hub = GitHub.connectToEnterprise("http://enterprise.kohsuke.org/api/v3", "bogus","bogus");
+        assertEquals("http://enterprise.kohsuke.org/api/v3/test", hub.getApiURL("/test").toString());
+    }
+    @Test
+    public void testGitHubServerWithHttps() throws Exception {
+        GitHub hub = GitHub.connectToEnterprise("https://enterprise.kohsuke.org/api/v3", "bogus","bogus");
+        assertEquals("https://enterprise.kohsuke.org/api/v3/test", hub.getApiURL("/test").toString());
+    }
+    @Test
+    public void testGitHubServerWithoutServer() throws Exception {
+        GitHub hub = GitHub.connectUsingPassword("kohsuke", "bogus");
+        assertEquals("https://api.github.com/test", hub.getApiURL("/test").toString());
+    }
+    @Test
+    public void testGitHubBuilderFromEnvironment() throws IOException {
+        
+        Map<String, String>props = new HashMap<String, String>();
+        
+        props.put("login", "bogus");
+        props.put("oauth", "bogus");
+        props.put("password", "bogus");
+        
+        setupEnvironment(props);
+        
+        GitHubBuilder builder = GitHubBuilder.fromEnvironment();
+        
+        assertEquals("bogus", builder.user);
+        assertEquals("bogus", builder.oauthToken);
+        assertEquals("bogus", builder.password);
+        
+    }
+    
+        // TODO
+
+    @Test
+    public void testGitHubBuilderFromCustomEnvironment() throws IOException {
+        Map<String, String> props = new HashMap<String, String>();
+
+        props.put("customLogin", "bogusLogin");
+        props.put("customOauth", "bogusOauth");
+        props.put("customPassword", "bogusPassword");
+        props.put("customEndpoint", "bogusEndpoint");
+
+        setupEnvironment(props);
+
+        GitHubBuilder builder = GitHubBuilder.fromEnvironment("customLogin", "customPassword", "customOauth", "customEndpoint");
+
+        assertEquals("bogusLogin", builder.user);
+        assertEquals("bogusOauth", builder.oauthToken);
+        assertEquals("bogusPassword", builder.password);
+        assertEquals("bogusEndpoint", builder.endpoint);
+    }
+
+    @Test
+    public void testGitHubEnterpriseDoesNotHaveRateLimit() throws IOException {
+        GitHub github = spy(new GitHubBuilder().build());
+        when(github.retrieve()).thenThrow(FileNotFoundException.class);
+
+        GHRateLimit rateLimit = github.getRateLimit();
+        assertThat(rateLimit.getResetDate(), notNullValue());
+    }
+
+    @Test
+    public void testGitHubIsApiUrlValid() throws IOException {
+        GitHub github = GitHub.connectAnonymously();
+        
+        try {
+            github.checkApiUrlValidity();
+        } catch (IOException ioe) {
+            assertTrue(ioe.getMessage().contains("private mode enabled"));
+        }
+    }
+
+    @Test
+    public void listUsers() throws IOException {
+        GitHub hub = GitHub.connect();
+        for (GHUser u : Iterables.limit(hub.listUsers(),10)) {
+            assert u.getName()!=null;
+            System.out.println(u.getName());
+        }
+    }
+}

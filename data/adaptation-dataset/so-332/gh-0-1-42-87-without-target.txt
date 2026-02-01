@@ -1,0 +1,95 @@
+
+package at.alladin.rmbt.android.util;
+
+import android.content.Context;
+import android.content.res.TypedArray;
+import android.graphics.drawable.Drawable;
+import android.util.AttributeSet;
+import android.view.ViewParent;
+import android.widget.Checkable;
+import android.widget.CheckedTextView;
+import android.widget.ListView;
+import android.widget.RelativeLayout;
+
+
+public class CheckableRelativeLayout extends RelativeLayout implements Checkable
+{
+    
+    private CheckedTextView mCheckedTextView;
+    private final Drawable mCheckDrawable;
+    private final Drawable mRadioDrawable;
+    private boolean mIsChecked;
+    
+        // TODO
+
+    
+    
+    @Override
+    public boolean isChecked()
+    {
+        return mIsChecked;
+    }
+    
+    
+    @Override
+    protected void onAttachedToWindow()
+    {
+        super.onAttachedToWindow();
+        
+        
+        
+        if (mCheckedTextView != null)
+        {
+            final ViewParent p = getParent();
+            
+            
+            if (p instanceof ListView)
+            {
+                final int choiceMode = ((ListView) p).getChoiceMode();
+                
+                
+                
+                switch (choiceMode)
+                {
+                case ListView.CHOICE_MODE_MULTIPLE:
+                    mCheckedTextView.setCheckMarkDrawable(mCheckDrawable);
+                    break;
+                
+                case ListView.CHOICE_MODE_SINGLE:
+                    mCheckedTextView.setCheckMarkDrawable(mRadioDrawable);
+                    break;
+                
+                default:
+                    mCheckedTextView.setCheckMarkDrawable(null);
+                    break;
+                }
+            }
+        }
+    }
+    
+    
+    @Override
+    protected void onFinishInflate()
+    {
+        super.onFinishInflate();
+        mCheckedTextView = (CheckedTextView) findViewById(android.R.id.text1);
+    }
+    
+    
+    @Override
+    public void setChecked(final boolean checked)
+    {
+        mIsChecked = checked;
+        
+        if (mCheckedTextView != null)
+            mCheckedTextView.setChecked(mIsChecked);
+    }
+    
+    
+    @Override
+    public void toggle()
+    {
+        setChecked(!mIsChecked);
+    }
+    
+}

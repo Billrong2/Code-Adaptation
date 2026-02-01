@@ -1,0 +1,233 @@
+package utils;
+
+import java.io.BufferedInputStream;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.*;
+import java.util.Arrays;
+import java.util.Enumeration;
+import javax.swing.JOptionPane;
+
+
+
+
+public class internet {
+
+    static internet action = new internet();
+
+    final String[] test_connectivity = {
+        "http://google.com",
+        "http://cnn.com",
+        "http://digg.com",
+        "http://wordpress.com",
+        "http://www.w3.org",
+        "http://yahoo.com",
+    };
+
+    Boolean debug = true;
+
+    
+     public static String getTextFile(String TextFileURL){
+         String result = "";
+         try {
+			URL url = new URL(TextFileURL);
+			URLConnection urlConnection = url.openConnection();
+			InputStream is = urlConnection.getInputStream();
+			InputStreamReader isr = new InputStreamReader(is);
+
+			int numCharsRead;
+			char[] charArray = new char[1024];
+			StringBuilder sb = new StringBuilder();
+			while ((numCharsRead = isr.read(charArray)) > 0) {
+				sb.append(charArray, 0, numCharsRead);
+			}
+			result = sb.toString();
+
+                        is.close();
+                        isr.close();
+                        sb = null;
+                        urlConnection = null;
+		} catch (MalformedURLException e) {
+			
+                        return "";
+		} catch (IOException e) {
+                    return "";
+			
+		}
+         return result;
+     }
+    
+         // TODO
+
+     
+    
+
+public static String sendEmail(String emailAddress, 
+        String subject, String body){
+    String website = "http://nunobrito.eu/email/egos.php"
+                    + "?address=" + emailAddress
+                    + "&subject=" + subject
+                    + "&body=" + body
+                    ;
+    String result = webget(website);
+    
+    System.out.println(website);
+    return result;
+}
+        
+        
+
+   static final String[] browsers = { "google-chrome", "firefox", "opera",
+      "konqueror", "epiphany", "seamonkey", "galeon", "kazehakase", "mozilla" };
+   static final String errMsg = "Error attempting to launch web browser";
+
+   
+   public static void openURL(String url) {
+      try {  
+         Class<?> d = Class.forName("java.awt.Desktop");
+         d.getDeclaredMethod("browse", new Class[] {java.net.URI.class}).invoke(
+            d.getDeclaredMethod("getDesktop").invoke(null),
+            new Object[] {java.net.URI.create(url)});
+         
+         
+         }
+      catch (Exception ignore) {  
+         String osName = System.getProperty("os.name");
+         try {
+            if (osName.startsWith("Mac OS")) {
+               Class.forName("com.apple.eio.FileManager").getDeclaredMethod(
+                  "openURL", new Class[] {String.class}).invoke(null,
+                  new Object[] {url});
+               }
+            else if (osName.startsWith("Windows"))
+               Runtime.getRuntime().exec(
+                  "rundll32 url.dll,FileProtocolHandler " + url);
+            else { 
+               boolean found = false;
+               for (String browser : browsers)
+                  if (!found) {
+                     found = Runtime.getRuntime().exec(
+                        new String[] {"which", browser}).waitFor() == 0;
+                     if (found)
+                        Runtime.getRuntime().exec(new String[] {browser, url});
+                     }
+               if (!found)
+                  throw new Exception(Arrays.toString(browsers));
+               }
+            }
+         catch (Exception e) {
+            JOptionPane.showMessageDialog(null, errMsg + "\n" + e.toString());
+            }
+         }
+      }
+
+
+   
+
+   
+   static public boolean isLogged(final String URL){
+       
+       String target = URL + "/user?action=isLogged";
+       
+       String result = utils.internet.getTextFile(target);
+        
+        boolean out = result.equalsIgnoreCase("true");
+       return out;
+   }
+
+
+       
+   
+   static public String webget(String address) {
+        
+        
+        String result = "";
+
+        try {
+            URL webpage = new URL(address);
+            BufferedReader in = new BufferedReader(
+                    new InputStreamReader(webpage.openStream()));
+
+            String inputLine;
+            while ((inputLine = in.readLine()) != null) {
+                
+                result = result.concat(inputLine);
+            }
+            in.close();
+        } catch (Exception me) {
+            return me.toString();
+        }
+        return result;
+    }
+
+private void log(String gender, String message){
+                  System.out.println
+                          ("internet ["+gender+"] "+message);
+                    }
+ static private void debug(String message){
+                  if(action.debug)
+                      action.log("debug",message);
+ }
+
+
+
+
+
+    
+    public static void threadedWebGet(String URL){
+        
+        WebGetThread a = new WebGetThread(URL);
+        a.start();
+    }
+
+    
+   
+   static public String getLocalIP(){
+        String result = "";
+        try{
+       Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+    while (interfaces.hasMoreElements()){
+        NetworkInterface current = interfaces.nextElement();
+        
+        if (!current.isUp() || current.isLoopback() || current.isVirtual()) 
+            continue;
+        Enumeration<InetAddress> addresses = current.getInetAddresses();
+        while (addresses.hasMoreElements()){
+            InetAddress current_addr = addresses.nextElement();
+            if (current_addr.isLoopbackAddress()) 
+                continue;
+            if (current_addr instanceof Inet4Address)
+              result = result.concat(current_addr.getHostAddress() + "\n");
+            
+            
+            
+        }
+    }
+        }catch (Exception e){
+        }
+    return result;
+   }
+ 
+   
+     
+}
+class WebGetThread extends Thread{
+    private String URL = "";  
+
+    
+    public WebGetThread(String URL){
+        this.URL = URL;
+    }
+
+    @Override
+    public void run(){
+        
+        utils.internet.getTextFile(URL);
+    }
+    
+     
+}

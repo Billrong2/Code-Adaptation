@@ -1,0 +1,40 @@
+package com.widen.valet.util;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+
+public class ListUtil
+{
+
+		// TODO
+
+
+	
+	public static final <T> List<List<T>> split(final List<T> original, final int maxListSize)
+	{
+		return split(original, maxListSize, ArrayList.class);
+	}
+
+	private static <T> List<T> createSublist(final T[] elements, final Class<? extends List> listImplementation)
+	{
+		List<T> sublist;
+		final List<T> asList = Arrays.asList(elements);
+		try
+		{
+			sublist = listImplementation.newInstance();
+			sublist.addAll(asList);
+		}
+		catch (final InstantiationException e)
+		{
+			sublist = asList;
+		}
+		catch (final IllegalAccessException e)
+		{
+			sublist = asList;
+		}
+
+		return sublist;
+	}
+}

@@ -1,0 +1,55 @@
+package com.nikonhacker.gui.swing;
+
+import java.awt.*;
+
+
+
+public class ModifiedFlowLayout extends FlowLayout {
+    public ModifiedFlowLayout() {
+        super();
+    }
+
+    public ModifiedFlowLayout(int align) {
+        super(align);
+    }
+    public ModifiedFlowLayout(int align, int hgap, int vgap) {
+        super(align, hgap, vgap);
+    }
+
+    public Dimension minimumLayoutSize(Container target) {
+        
+        
+        return computeMinSize(target);
+    }
+
+    public Dimension preferredLayoutSize(Container target) {
+        return computeSize(target);
+    }
+
+    // TODO
+
+
+    private Dimension computeMinSize(Container target) {
+        synchronized (target.getTreeLock()) {
+            int minx = Integer.MAX_VALUE;
+            int miny = Integer.MIN_VALUE;
+            boolean found_one = false;
+            int n = target.getComponentCount();
+
+            for (int i = 0; i < n; i++) {
+                Component c = target.getComponent(i);
+                if (c.isVisible()) {
+                    found_one = true;
+                    Dimension d = c.getPreferredSize();
+                    minx = Math.min(minx, d.width);
+                    miny = Math.min(miny, d.height);
+                }
+            }
+            if (found_one) {
+                return new Dimension(minx, miny);
+            }
+            return new Dimension(0, 0);
+        }
+    }
+
+}

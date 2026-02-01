@@ -1,0 +1,64 @@
+package com.anod.appwatcher.model;
+
+import com.anod.appwatcher.utils.BitmapUtils;
+
+import android.database.CrossProcessCursor;
+import android.database.Cursor;
+import android.database.CursorWindow;
+import android.database.CursorWrapper;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+
+public class AppListCursor extends CursorWrapper implements CrossProcessCursor {
+    private static final int IDX_ROWID = 0;	
+    private static final int IDX_APPID = 1;	
+    private static final int IDX_PACKAGE = 2;
+    private static final int IDX_VERSION_NUMBER = 3;    
+    private static final int IDX_VERSION_NAME = 4;
+    private static final int IDX_TITLE = 5;    
+    private static final int IDX_CREATOR = 6;    
+    private static final int IDX_ICON_CACHE = 7;
+    private static final int IDX_STATUS = 8;
+    private static final int IDX_UPDATE_DATE = 9;
+
+	public AppListCursor(Cursor cursor) {
+		super(cursor);
+	}
+
+	public AppInfo getAppInfo() {
+		byte[] iconData = getBlob(IDX_ICON_CACHE);
+		Bitmap icon = BitmapUtils.unFlattenBitmap(iconData);
+
+		return new AppInfo(
+			getInt(IDX_ROWID),
+			getString(IDX_APPID),
+			getString(IDX_PACKAGE),
+			getInt(IDX_VERSION_NUMBER),
+			getString(IDX_VERSION_NAME),
+			getString(IDX_TITLE),
+			getString(IDX_CREATOR),
+			icon,
+			getInt(IDX_STATUS),
+			getLong(IDX_UPDATE_DATE)
+		);
+	}
+	
+	protected void finalize() throws Throwable {
+	    
+	    
+		
+	}
+
+		// TODO
+
+
+	@Override
+	public CursorWindow getWindow() {
+		return null;
+	}
+
+	@Override
+	public boolean onMove(int oldPosition, int newPosition) {
+		return true;
+	}	
+}

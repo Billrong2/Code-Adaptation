@@ -1,0 +1,43 @@
+package org.droidplanner.android.widgets.button;
+
+import org.droidplanner.R;
+
+import android.content.Context;
+import android.content.res.TypedArray;
+import android.graphics.Canvas;
+import android.graphics.drawable.Drawable;
+import android.util.AttributeSet;
+import android.view.Gravity;
+import android.widget.RadioButton;
+
+
+public class RadioButtonCenter extends RadioButton {
+
+	
+	private Drawable mButtonDrawable;
+
+	public RadioButtonCenter(Context context) {
+		super(context);
+	}
+
+	public RadioButtonCenter(Context context, AttributeSet attrs) {
+		this(context, attrs, 0);
+	}
+
+	public RadioButtonCenter(Context context, AttributeSet attrs, int defStyle) {
+		super(context, attrs, defStyle);
+
+		final TypedArray attributes = context.obtainStyledAttributes(attrs,
+				R.styleable.RadioButtonCenter, defStyle, 0);
+
+		try {
+			mButtonDrawable = attributes.getDrawable(R.styleable.RadioButtonCenter_android_button);
+		} finally {
+			attributes.recycle();
+		}
+		setButtonDrawable(android.R.color.transparent);
+	}
+
+	// TODO
+
+}

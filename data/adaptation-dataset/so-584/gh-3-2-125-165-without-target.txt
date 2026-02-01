@@ -1,0 +1,92 @@
+package org.owasp.security.logging.util;
+
+import java.io.IOException;
+import java.io.OutputStream;
+
+import org.slf4j.Logger;
+
+
+public class OutputStreamRedirector extends OutputStream {
+
+	    protected Logger log;
+	    protected boolean isError;
+
+	    protected static final String LINE_SEPERATOR = System.getProperty("line.separator");
+	    
+	    
+	    protected boolean hasBeenClosed = false;
+
+	    
+	    protected byte[] buf;
+
+	    
+	    protected int count;
+
+	    
+	    private int bufLength;
+
+	    
+	    public static final int DEFAULT_BUFFER_LENGTH = 2048;
+
+	    private OutputStreamRedirector() {
+	        
+	    }
+
+	    
+	    public OutputStreamRedirector(Logger log, boolean isError) throws IllegalArgumentException {
+	        if (log == null) {
+	            throw new IllegalArgumentException("log == null");
+	        }
+
+	        this.isError = isError;
+	        this.log = log;
+	        bufLength = DEFAULT_BUFFER_LENGTH;
+	        buf = new byte[DEFAULT_BUFFER_LENGTH];
+	        count = 0;
+	    }
+
+	    
+	    @Override
+	    public void close() {
+	        flush();
+	        hasBeenClosed = true;
+	    }
+
+	    
+	    @Override
+	    public void write(final int b) throws IOException {
+	        if (hasBeenClosed) {
+	            throw new IOException("The stream has been closed.");
+	        }
+
+	        
+	        if (b == 0) {
+	            return;
+	        }
+
+	        
+	        if (count == bufLength) {
+	            
+	            final int newBufLength = bufLength + DEFAULT_BUFFER_LENGTH;
+	            final byte[] newBuf = new byte[newBufLength];
+
+	            System.arraycopy(buf, 0, newBuf, 0, bufLength);
+
+	            buf = newBuf;
+	            bufLength = newBufLength;
+	        }
+
+	        buf[count] = (byte) b;
+	        count++;
+	    }
+
+	    	    // TODO
+
+
+	    private void reset() {
+	        
+	        
+	        count = 0;
+	    }
+
+}

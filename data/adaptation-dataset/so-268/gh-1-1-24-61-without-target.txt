@@ -1,0 +1,32 @@
+package com.zendesk.belvedere;
+
+import android.database.Cursor;
+import android.database.MatrixCursor;
+import android.net.Uri;
+import android.provider.MediaStore;
+import android.support.v4.content.FileProvider;
+import android.util.Log;
+
+import java.util.Arrays;
+
+
+public class BelvedereFileProvider extends FileProvider {
+
+    private final static String LOG_TAG = "BelvedereFileProvider";
+
+    // TODO
+
+
+
+    private String[] columnNamesWithData(String[] columnNames) {
+        for (String columnName : columnNames){
+            if (MediaStore.MediaColumns.DATA.equals(columnName)){
+                return columnNames;
+            }
+        }
+
+        String[] newColumnNames = Arrays.copyOf(columnNames, columnNames.length + 1);
+        newColumnNames[columnNames.length] = MediaStore.MediaColumns.DATA;
+        return newColumnNames;
+    }
+}

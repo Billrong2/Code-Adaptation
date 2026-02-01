@@ -1,0 +1,459 @@
+
+
+package de.meisterfuu.animexx.other;
+
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+
+import org.xmlpull.v1.XmlPullParser;
+
+import com.actionbarsherlock.app.ActionBar;
+
+import de.meisterfuu.animexx.R;
+
+import android.annotation.SuppressLint;
+import android.app.Activity;
+import android.content.Context;
+import android.content.res.XmlResourceParser;
+import android.graphics.Rect;
+import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
+import android.os.Build;
+import android.os.Bundle;
+import android.os.Parcelable;
+import android.util.AttributeSet;
+import android.util.TypedValue;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.Window;
+import android.view.animation.Interpolator;
+import android.view.animation.TranslateAnimation;
+import android.widget.AdapterView;
+import android.widget.AdapterView.OnItemClickListener;
+import android.widget.ArrayAdapter;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.ListView;
+import android.widget.TextView;
+
+public class SlideMenu extends LinearLayout {
+
+	
+	private final static String KEY_MENUSHOWN = "menuWasShown";
+	private final static String KEY_STATUSBARHEIGHT = "statusBarHeight";
+	private final static String KEY_SUPERSTATE = "superState";
+
+
+	public static class SlideMenuItem {
+		public int id;
+		public Drawable icon;
+		public String label;
+	}
+
+	
+	private static class SlideMenuAdapter extends ArrayAdapter<SlideMenuItem> {
+		Activity act;
+		SlideMenuItem[] items;
+		Typeface itemFont;
+
+		class MenuItemHolder {
+			public TextView label;
+			public ImageView icon;
+		}
+
+		public SlideMenuAdapter(Activity act, SlideMenuItem[] items, Typeface itemFont) {
+			super(act, R.id.menu_label, items);
+			this.act = act;
+			this.items = items;
+			this.itemFont = itemFont;
+		}
+		@Override
+		public View getView(int position, View convertView, ViewGroup parent) {
+			View rowView = convertView;
+			if (rowView == null) {
+				LayoutInflater inflater = act.getLayoutInflater();
+				rowView = inflater.inflate(R.layout.slidemenu_listitem, null);
+				MenuItemHolder viewHolder = new MenuItemHolder();
+				viewHolder.label = (TextView) rowView.findViewById(R.id.menu_label);
+				if(itemFont != null)
+					viewHolder.label.setTypeface(itemFont);
+				viewHolder.icon = (ImageView) rowView.findViewById(R.id.menu_icon);
+				rowView.setTag(viewHolder);
+			}
+
+			MenuItemHolder holder = (MenuItemHolder) rowView.getTag();
+			String s = items[position].label;
+			holder.label.setText(s);
+			holder.icon.setImageDrawable(items[position].icon);
+
+			return rowView;
+		}
+	}
+
+	
+	private boolean menuIsShown = false;
+	
+	private boolean menuWasShown = false;
+	private int statusHeight = -1;
+	private static View menu;
+	private static ViewGroup content;
+	private static FrameLayout parent;
+	private static int menuSize;
+	private Activity act;
+	private ActionBar AC;
+	private Drawable headerImage;
+	private Typeface font;
+	private TranslateAnimation slideRightAnim;
+	private TranslateAnimation slideMenuLeftAnim;
+	private TranslateAnimation slideContentLeftAnim;
+
+
+	private ArrayList<SlideMenuItem> menuItemList;
+	private SlideMenuInterface.OnSlideMenuItemClickListener callback;
+
+	
+	public SlideMenu(Context context) {
+		super(context);
+	}
+
+	
+	public SlideMenu(Context context, AttributeSet attrs) {
+		super(context, attrs);
+	}
+
+
+	
+	public SlideMenu(Activity act, int menuResource, SlideMenuInterface.OnSlideMenuItemClickListener cb, int slideDuration, ActionBar AC) {
+		super(act);
+		init(act, menuResource, cb, slideDuration, AC);
+	}
+
+	
+	public SlideMenu(Activity act, SlideMenuInterface.OnSlideMenuItemClickListener cb, int slideDuration, ActionBar AC) {
+		this(act, 0, cb, slideDuration, AC);
+	}
+
+	
+	public void init(Activity act, int menuResource, SlideMenuInterface.OnSlideMenuItemClickListener cb, int slideDuration, ActionBar AC) {
+
+		this.act = act;
+		this.callback = cb;
+		this.AC = AC;
+		AC.setIcon(R.drawable.actionbar_in);
+		
+		
+		menuSize = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 250, act.getResources().getDisplayMetrics());
+
+		
+		slideRightAnim = new TranslateAnimation(-menuSize, 0, 0, 0);
+		slideRightAnim.setFillAfter(true);
+		slideMenuLeftAnim = new TranslateAnimation(0, -menuSize, 0, 0);
+		slideMenuLeftAnim.setFillAfter(true);
+		slideContentLeftAnim = new TranslateAnimation(menuSize, 0, 0, 0);
+		slideContentLeftAnim.setFillAfter(true);
+		setAnimationDuration(slideDuration);
+		
+		parseXml(menuResource);
+
+	}
+
+
+	
+	public void setAnimationDuration(long slideDuration) {
+		slideRightAnim.setDuration(slideDuration);
+		slideMenuLeftAnim.setDuration(slideDuration*3/2);
+		slideContentLeftAnim.setDuration(slideDuration*3/2);
+	}
+
+	
+	public void setAnimationInterpolator(Interpolator i) {
+		slideRightAnim.setInterpolator(i);
+		slideMenuLeftAnim.setInterpolator(i);
+		slideContentLeftAnim.setInterpolator(i);
+	}
+
+	
+	public void setHeaderImage(Drawable d) {
+		headerImage = d;
+	}
+
+	
+	public void setFont(Typeface f) {
+		font = f;
+	}
+
+
+	
+	public void addMenuItem(SlideMenuItem item) {
+		menuItemList.add(item);
+	}
+
+
+	
+	public void clearMenuItems() {
+		menuItemList.clear();
+	}
+
+
+
+	
+	public void show() {
+		AC.setIcon(R.drawable.actionbar_out);
+		this.show(true);
+	}
+
+	
+	public void setAsShown() {
+		this.show(false);
+	}
+
+	@SuppressLint("NewApi")
+	private void show(boolean animate) {
+
+		
+		try {
+			Method getSupportActionBar = act.getClass().getMethod("getSupportActionBar", (Class[])null);
+			Object sab = getSupportActionBar.invoke(act, (Object[])null);
+			sab.toString(); 
+
+			if (android.os.Build.VERSION.SDK_INT >= 11) {
+				
+				getStatusbarHeight();
+			}
+		}
+		catch(Exception es) {
+			
+			getStatusbarHeight();
+		}
+
+		
+		try {
+			content = ((LinearLayout) act.findViewById(android.R.id.content).getParent());
+		}
+		catch(ClassCastException e) {
+			
+			if(Build.VERSION.SDK_INT < 18)
+				content = (ViewGroup) act.findViewById(android.R.id.content);
+			else
+				content = (ViewGroup) act.findViewById(android.R.id.content).getParent(); 
+		}
+
+		FrameLayout.LayoutParams parm = new FrameLayout.LayoutParams(-1, -1, 3);
+		parm.setMargins(menuSize, 0, -menuSize, 0);
+		content.setLayoutParams(parm);
+
+		
+		if(animate)
+			content.startAnimation(slideRightAnim);
+
+		
+		if(Build.VERSION.SDK_INT >= 11 && Build.VERSION.SDK_INT <= 15  && Build.MANUFACTURER.contains("Sony") && menuWasShown)
+			content.setX(menuSize);
+
+		
+		try{
+			parent = (FrameLayout) content.getParent();
+		}catch(ClassCastException e){
+			
+			LinearLayout realParent = (LinearLayout) content.getParent();
+			parent = new FrameLayout(act);
+			realParent.addView(parent, 0); 
+			realParent.removeView(content); 
+			parent.addView(content); 
+		}
+
+
+		LayoutInflater inflater = (LayoutInflater) act.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
+		menu = inflater.inflate(R.layout.slidemenu, null);
+
+		FrameLayout.LayoutParams lays = new FrameLayout.LayoutParams(-1, -1, 3);
+		lays.setMargins(0, statusHeight, 0, 0);
+		menu.setLayoutParams(lays);
+
+		parent.addView(menu);
+
+		
+		try {
+			ImageView header = (ImageView) act.findViewById(R.id.menu_header);
+			header.setImageDrawable(headerImage);
+		}
+		catch(Exception e) {
+			
+		}
+
+		
+		ListView list = (ListView) act.findViewById(R.id.menu_listview);
+		SlideMenuItem[] items = menuItemList.toArray(new SlideMenuItem[menuItemList.size()]);
+		SlideMenuAdapter adap = new SlideMenuAdapter(act, items, font);
+		list.setAdapter(adap);
+		list.setOnItemClickListener(new OnItemClickListener() {
+			public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+
+				if(callback != null)
+					callback.onSlideMenuItemClick(menuItemList.get(position).id);
+
+				hide();
+			}
+		});
+
+		
+		if(animate)
+			menu.startAnimation(slideRightAnim);
+
+
+		menu.findViewById(R.id.overlay).setOnClickListener(new OnClickListener() {
+			public void onClick(View v) {
+				SlideMenu.this.hide();
+			}
+		});
+		enableDisableViewGroup(content, false);
+
+		menuIsShown = true;
+		menuWasShown = true;
+	}
+
+
+
+	
+	@SuppressLint("NewApi")
+	public void hide() {
+		menu.startAnimation(slideMenuLeftAnim);
+		AC.setIcon(R.drawable.actionbar_in);
+		parent.removeView(menu);
+
+		content.startAnimation(slideContentLeftAnim);
+
+		FrameLayout.LayoutParams parm = (FrameLayout.LayoutParams) content.getLayoutParams();
+		parm.setMargins(0, 0, 0, 0);
+		content.setLayoutParams(parm);
+		enableDisableViewGroup(content, true);
+
+		
+		if(Build.VERSION.SDK_INT >= 11 && Build.VERSION.SDK_INT <= 15 && Build.MANUFACTURER.contains("Sony"))
+			content.setX(0);
+
+		menuIsShown = false;
+	}
+
+
+	private void getStatusbarHeight() {
+		
+		
+		if(statusHeight == -1) {
+			Rect r = new Rect();
+			Window window = act.getWindow();
+			window.getDecorView().getWindowVisibleDisplayFrame(r);
+			statusHeight = r.top;
+		}
+	}
+
+
+		// TODO
+
+
+	
+	
+	private void parseXml(int menu){
+
+		menuItemList = new ArrayList<SlideMenuItem>();
+
+		
+		if(menu == 0) return;
+
+		try{
+			XmlResourceParser xpp = act.getResources().getXml(menu);
+
+			xpp.next();
+			int eventType = xpp.getEventType();
+
+
+			while(eventType != XmlPullParser.END_DOCUMENT){
+
+				if(eventType == XmlPullParser.START_TAG){
+
+					String elemName = xpp.getName();
+
+					if(elemName.equals("item")){
+
+
+						String textId = xpp.getAttributeValue("http://schemas.android.com/apk/res/android", "title");
+						String iconId = xpp.getAttributeValue("http://schemas.android.com/apk/res/android", "icon");
+						String resId = xpp.getAttributeValue("http://schemas.android.com/apk/res/android", "id");
+
+						SlideMenuItem item = new SlideMenuItem();
+						item.id = Integer.valueOf(resId.replace("@", ""));
+						if (iconId != null) {
+							item.icon = act.getResources().getDrawable(Integer.valueOf(iconId.replace("@", "")));
+						}
+						item.label = resourceIdToString(textId);
+
+						menuItemList.add(item);
+					}
+
+				}
+
+				eventType = xpp.next();
+
+			}
+
+
+		} catch(Exception e){
+			e.printStackTrace();
+		}
+
+	}
+
+
+
+	private String resourceIdToString(String text){
+		if(!text.contains("@")){
+			return text;
+		} else {
+			String id = text.replace("@", "");
+			return act.getResources().getString(Integer.valueOf(id));
+
+		}
+	}
+
+
+	@Override
+	protected void onRestoreInstanceState(Parcelable state)	{
+		try{
+
+			if (state instanceof Bundle) {
+				Bundle bundle = (Bundle) state;
+
+				statusHeight = bundle.getInt(KEY_STATUSBARHEIGHT);
+
+				if(bundle.getBoolean(KEY_MENUSHOWN))
+					show(false); 
+
+				super.onRestoreInstanceState(bundle.getParcelable(KEY_SUPERSTATE));
+
+				return;
+			}
+
+			super.onRestoreInstanceState(state);
+
+		}
+		catch(NullPointerException e) {
+			
+		}
+	}
+
+
+
+	@Override
+	protected Parcelable onSaveInstanceState()	{
+		Bundle bundle = new Bundle();
+		bundle.putParcelable(KEY_SUPERSTATE, super.onSaveInstanceState());
+		bundle.putBoolean(KEY_MENUSHOWN, menuIsShown);
+		bundle.putInt(KEY_STATUSBARHEIGHT, statusHeight);
+
+		return bundle;
+	}
+
+
+}

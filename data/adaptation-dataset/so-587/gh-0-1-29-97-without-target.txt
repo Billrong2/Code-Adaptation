@@ -1,0 +1,15 @@
+
+package org.powermock.modules.junit4.common.internal.impl;
+
+import java.util.Comparator;
+
+
+class VersionComparator implements Comparator {
+
+    public boolean equals(Object o1, Object o2) {
+        return compare(o1, o2) == 0;
+    }
+
+    // TODO
+
+}

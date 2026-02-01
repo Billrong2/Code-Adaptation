@@ -1,0 +1,123 @@
+package com.makemyandroidapp.googleformuploader;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLConnection;
+
+import org.apache.http.HttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.params.ClientPNames;
+import org.apache.http.client.params.CookiePolicy;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.params.BasicHttpParams;
+import org.apache.http.params.HttpConnectionParams;
+import org.apache.http.params.HttpParams;
+import org.apache.http.protocol.BasicHttpContext;
+import org.apache.http.protocol.HttpContext;
+import org.apache.http.util.EntityUtils;
+import org.json.JSONObject;
+
+import android.util.Log;
+
+
+
+public class HttpRequest{
+
+    DefaultHttpClient httpClient;
+    HttpContext localContext;
+    private String ret;
+
+    HttpResponse response = null;
+    HttpPost httpPost = null;
+    HttpGet httpGet = null;
+
+    public HttpRequest(){
+        HttpParams myParams = new BasicHttpParams();
+
+        HttpConnectionParams.setConnectionTimeout(myParams, 10000);
+        HttpConnectionParams.setSoTimeout(myParams, 10000);
+        httpClient = new DefaultHttpClient(myParams);       
+        localContext = new BasicHttpContext();    
+    }
+
+    public void clearCookies() {
+        httpClient.getCookieStore().clear();
+    }
+
+    public void abort() {
+        try {
+            if (httpClient != null) {
+                System.out.println("Abort.");
+                httpPost.abort();
+            }
+        } catch (Exception e) {
+            System.out.println("Your App Name Here" + e);
+        }
+    }
+
+    public String sendPost(String url, String data) {
+        return sendPost(url, data, null);
+    }
+
+    public String sendJSONPost(String url, JSONObject data) {
+        return sendPost(url, data.toString(), "application/json");
+    }
+
+    // TODO
+
+
+    public String sendGet(String url) {
+        httpGet = new HttpGet(url);  
+
+        try {
+            response = httpClient.execute(httpGet);  
+        } catch (Exception e) {
+            Log.e("Your App Name Here", e.getMessage());
+        }
+
+        
+
+        
+        try {
+            ret = EntityUtils.toString(response.getEntity());  
+        } catch (IOException e) {
+            Log.e("Your App Name Here", e.getMessage());
+        }
+
+        return ret;
+    }
+
+    public InputStream getHttpStream(String urlString) throws IOException {
+        InputStream in = null;
+        int response = -1;
+
+        URL url = new URL(urlString); 
+        URLConnection conn = url.openConnection();
+
+        if (!(conn instanceof HttpURLConnection))                     
+            throw new IOException("Not an HTTP connection");
+
+        try{
+            HttpURLConnection httpConn = (HttpURLConnection) conn;
+            httpConn.setAllowUserInteraction(false);
+            httpConn.setInstanceFollowRedirects(true);
+            httpConn.setRequestMethod("GET");
+            httpConn.connect(); 
+
+            response = httpConn.getResponseCode();                 
+
+            if (response == HttpURLConnection.HTTP_OK) {
+                in = httpConn.getInputStream();                                 
+            }                     
+        } catch (Exception e) {
+            throw new IOException("Error connecting");            
+        } 
+
+        return in;     
+    }
+}

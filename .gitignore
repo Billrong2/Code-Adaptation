@@ -1,0 +1,8 @@
+# Docker (optional environment files)
+Dockerfile
+docker-compose.yml
+
+# Local repo snapshots / clones (large; not intended for Git)
+github_repos_by_commit/
+github_repos_current/
+

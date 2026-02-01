@@ -1,0 +1,197 @@
+
+package de.jetwick.util;
+
+import java.io.Serializable;
+import java.util.Date;
+
+
+public class MyDate implements Cloneable, Serializable {
+
+    private long time;
+    public static final long ONE_SECOND = 1000L;
+    public static final long ONE_MINUTE = 60 * ONE_SECOND;
+    public static final long ONE_HOUR = 60 * ONE_MINUTE;
+    public static final long ONE_DAY = 24 * ONE_HOUR;
+    public static final long ONE_WEEK = 7 * ONE_DAY;
+
+    public MyDate() {
+        this(new Date());
+    }
+
+    public MyDate(Date date) {
+        if (date == null)
+            throw new NullPointerException("date mustn't be null!");
+        time = date.getTime();
+    }
+
+    public MyDate(long time) {
+        this.time = time;
+    }
+
+    public MyDate(MyDate date) {
+        if (date == null)
+            throw new NullPointerException("date mustn't be null!");
+        time = date.getTime();
+    }
+
+    public long getTime() {
+        return time;
+    }
+
+    public MyDate plusMillis(long ms) {
+        time += ms;
+        return this;
+    }
+
+    public MyDate plusSeconds(long sec) {
+        time += sec * ONE_SECOND;
+        return this;
+    }
+
+    public MyDate plusMinutes(int minutes) {
+        time += minutes * ONE_MINUTE;
+        return this;
+    }
+
+    public MyDate plusHours(int hours) {
+        time += hours * ONE_HOUR;
+        return this;
+    }
+
+    public MyDate plusDays(int days) {
+        time += days * ONE_DAY;
+        return this;
+    }
+
+    public MyDate minusMinutes(int minutes) {
+        return plusMinutes(-minutes);
+    }
+
+    public MyDate minusHours(int hours) {
+        return plusHours(-hours);
+    }
+
+    public MyDate minusDays(int days) {
+        return plusDays(-days);
+    }
+
+    public MyDate minus(MyDate date) {
+        time -= date.getTime();
+        return this;
+    }
+
+    public MyDate minus(long time) {
+        this.time -= time;
+        return this;
+    }
+
+    public MyDate castToHour() {
+        time = (time / ONE_HOUR) * ONE_HOUR;
+        return this;
+    }
+
+    public MyDate castToHours(int hours) {
+        time = (time / (hours * ONE_HOUR)) * hours * ONE_HOUR;
+        return this;
+    }
+
+    public MyDate castToMinute() {
+        time = (time / ONE_MINUTE) * ONE_MINUTE;
+        return this;
+    }
+
+    public MyDate castToDay() {
+        time = (time / ONE_DAY) * ONE_DAY;
+        return this;
+    }
+
+    public long toDays() {
+        return time / ONE_DAY;
+    }
+
+    public Date toDate() {
+        return new Date(time);
+    }
+
+    @Override
+    public MyDate clone() {
+        return new MyDate(this);
+    }
+
+    @Override
+    public String toString() {
+        return new Date(time).toString();
+    }
+
+    public String toLocalString() {
+        return Helper.toLocalDateTime(new Date(time));
+    }
+
+    public long getHours() {
+        return time / ONE_HOUR;
+    }
+    
+    public long getMinutes() {
+        return time / ONE_MINUTE;
+    }
+
+    public long getDays() {
+        return time / ONE_DAY;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (obj == null)
+            return false;
+        if (getClass() != obj.getClass())
+            return false;
+        final MyDate other = (MyDate) obj;
+        if (this.time != other.time)
+            return false;
+        return true;
+    }
+
+    @Override
+    public int hashCode() {
+        int hash = 3;
+        hash = 71 * hash + (int) (this.time ^ (this.time >>> 32));
+        return hash;
+    }
+
+    
+    public int _getHoursOfDay() {
+        return (int) ((time - new MyDate().castToDay().getTime()) / ONE_HOUR);
+    }
+
+    // TODO
+
+
+    
+    public String getTimesAgo() {
+        StringBuilder res = new StringBuilder();
+        long duration = System.currentTimeMillis() - time;
+        long temp = 0;
+        if (duration <= ONE_SECOND)
+            return "0 second ago";
+
+        temp = duration / ONE_DAY;
+        if (temp > 0)
+            return Helper.toSimpleDateTime(new Date(time));
+
+        temp = duration / ONE_HOUR;
+        if (temp > 0)
+            res.append(temp).append(" hour").append(temp > 1 ? "s" : "").append(" ago");
+        else {
+            temp = duration / ONE_MINUTE;
+            if (temp > 0)
+                res.append(temp).append(" minute").append(temp > 1 ? "s" : "").append(" ago");
+            else {
+                temp = duration / ONE_SECOND;
+                if (temp > 0)
+                    res.append(temp).append(" second").append(temp > 1 ? "s" : "").append(" ago");
+            }
+        }
+
+        return res.toString();
+    }
+}

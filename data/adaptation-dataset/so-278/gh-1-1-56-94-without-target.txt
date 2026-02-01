@@ -1,0 +1,43 @@
+
+package fuzion24.device.vulnerability.vulnerabilities.helper;
+
+import android.content.Context;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
+import java.lang.reflect.Method;
+
+
+public class SystemUtils {
+    private SystemUtils() {
+    }
+
+    public static int ProcfindPidFor(String executable) throws IOException {
+        File f = new File("/proc");
+        for (File d : f.listFiles()) {
+            String cmdLineString = d.getAbsolutePath() + "/cmdline";
+            File cmdLine = new File(cmdLineString);
+            if (cmdLine.exists()) {
+                BufferedReader in = null;
+                try {
+                    in = new BufferedReader(new FileReader(cmdLine));
+                    String line = in.readLine();
+                    if ((line != null) && line.startsWith(executable)) {
+                        return Integer.decode(d.getName());
+                    }
+                } finally {
+                    if (in != null) {
+                        in.close();
+                    }
+                }
+            }
+        }
+        throw new RuntimeException("should never get here");
+    }
+
+        // TODO
+
+
+}

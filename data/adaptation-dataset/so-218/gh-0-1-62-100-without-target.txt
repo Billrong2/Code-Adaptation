@@ -1,0 +1,51 @@
+
+package net.bootsfaces.render;
+
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
+import java.nio.channels.ReadableByteChannel;
+import java.nio.channels.WritableByteChannel;
+import java.util.Map.Entry;
+
+import javax.faces.application.Resource;
+import javax.faces.application.ResourceHandler;
+import javax.faces.application.ResourceHandlerWrapper;
+import javax.faces.context.ExternalContext;
+import javax.faces.context.FacesContext;
+import javax.servlet.http.HttpServletResponse;
+
+
+public class UnmappedResourceHandler extends ResourceHandlerWrapper {
+
+    private ResourceHandler wrapped;
+
+    public UnmappedResourceHandler(ResourceHandler wrapped) {
+        this.wrapped = wrapped;
+    }
+
+    @Override
+    public Resource createResource(final String resourceName, final String libraryName) {
+        final Resource resource = super.createResource(resourceName, libraryName);
+
+        if (resource == null) {
+            return null;
+        }
+        return new BsfResWrapper(resource);
+        
+    }
+
+    @Override
+    public boolean isResourceRequest(FacesContext context) {
+        return ResourceHandler.RESOURCE_IDENTIFIER.equals(context.getExternalContext().getRequestServletPath());
+    }
+
+    // TODO
+
+
+    @Override
+    public ResourceHandler getWrapped() {
+        return wrapped;
+    }
+
+}

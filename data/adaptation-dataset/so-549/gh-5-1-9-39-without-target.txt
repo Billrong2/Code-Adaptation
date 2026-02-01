@@ -1,0 +1,13 @@
+package com.marginallyclever.util;
+
+
+public final class UnitTestHelper {
+
+    // TODO
+
+
+  
+  private UnitTestHelper() throws IllegalStateException {
+    throw new IllegalStateException();
+  }
+}

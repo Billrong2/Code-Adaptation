@@ -1,0 +1,28 @@
+
+
+
+
+
+
+
+
+
+
+package edu.harvard.hul.ois.fits.tools.mediainfo;
+
+
+import java.util.Locale;
+
+public final class OsCheck {
+
+  
+  public enum OSType {
+    Windows, MacOS, Linux, Other
+  };
+
+  
+  protected static OSType detectedOS;
+
+    // TODO
+
+}

@@ -1,0 +1,177 @@
+
+
+package org.andstatus.app.util;
+
+import android.app.Activity;
+import android.content.ActivityNotFoundException;
+import android.content.Context;
+import android.os.Parcel;
+import android.support.annotation.IdRes;
+import android.support.annotation.NonNull;
+import android.text.Html;
+import android.text.Layout;
+import android.text.Selection;
+import android.text.Spannable;
+import android.text.SpannableString;
+import android.text.Spanned;
+import android.text.TextUtils;
+import android.text.style.ClickableSpan;
+import android.text.style.URLSpan;
+import android.text.util.Linkify;
+import android.view.MotionEvent;
+import android.view.View;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import org.andstatus.app.R;
+import org.andstatus.app.context.MyContextHolder;
+
+
+public class MyUrlSpan extends URLSpan {
+
+    public static final String SOFT_HYPHEN = "\u00AD";
+
+    public static final Creator<MyUrlSpan> CREATOR = new Creator<MyUrlSpan>() {
+        @Override
+        public MyUrlSpan createFromParcel(Parcel in) {
+            return new MyUrlSpan(in.readString());
+        }
+
+        @Override
+        public MyUrlSpan[] newArray(int size) {
+            return new MyUrlSpan[size];
+        }
+    };
+
+    private MyUrlSpan(String url) {
+        super(url);
+    }
+
+    @Override
+    public void onClick(@NonNull View widget) {
+        try {
+            super.onClick(widget);
+        } catch (ActivityNotFoundException e) {
+            MyLog.v(this, e);
+            try {
+                MyLog.i(this, "Malformed link:'" + getURL() + "'");
+                Context context = MyContextHolder.get().context();
+                if (context != null) {
+                    Toast.makeText(context, context.getText(R.string.malformed_link)
+                                    + "\n URL:'" + getURL() + "'", Toast.LENGTH_SHORT).show();
+                }
+            } catch (Exception e2) {
+                MyLog.d(this, "Couldn't show a toast", e2);
+            }
+        }
+    }
+
+    public static void showText(Activity activity, @IdRes int viewId, String text, boolean linkify, boolean showIfEmpty) {
+        showText((TextView) activity.findViewById(viewId), text, linkify, showIfEmpty);
+    }
+
+    public static void showText(View parentView, @IdRes int viewId, String text, boolean linkify, boolean showIfEmpty) {
+        showText((TextView) parentView.findViewById(viewId), text, linkify, showIfEmpty);
+    }
+
+    public static void showText(TextView textView, String text, boolean linkify, boolean showIfEmpty) {
+        if (textView == null) return;
+        if (TextUtils.isEmpty(text)) {
+            textView.setText("");
+            showView(textView, showIfEmpty);
+        } else {
+            if (linkify) {
+                textView.setFocusable(true);
+                textView.setFocusableInTouchMode(true);
+                textView.setLinksClickable(true);
+            }
+            
+            
+            if (text.contains(SOFT_HYPHEN)) {
+                text = text.replace(SOFT_HYPHEN, "-");
+            }
+            Spanned spanned = MyHtml.hasHtmlMarkup(text) ? Html.fromHtml(text) : new SpannableString(text);
+            textView.setText(spanned);
+            if (linkify && !hasUrlSpans(spanned)) {
+                Linkify.addLinks(textView, Linkify.WEB_URLS);
+            }
+            fixUrlSpans(textView);
+            if (linkify) {
+                setOnTouchListener(textView);
+            }
+            showView(textView, true);
+        }
+    }
+
+    
+    public static void setOnTouchListener(TextView textView) {
+        textView.setMovementMethod(null);
+        textView.setOnTouchListener(
+                new View.OnTouchListener() {
+                    @Override
+                    public boolean onTouch(View v, MotionEvent event) {
+                        return onTouchEvent(v, event);
+                    }
+                }
+        );
+    }
+
+    // TODO
+
+
+    
+    public static boolean showView(View parentView, int viewId, boolean show) {
+        return parentView != null &&
+            showView(parentView.findViewById(viewId), show);
+    }
+
+    
+    public static boolean showView(View view, boolean show) {
+        boolean success = view != null;
+        if (success) {
+            if (show) {
+                if (view.getVisibility() != View.VISIBLE) {
+                    view.setVisibility(View.VISIBLE);
+                }
+            } else {
+                if (view.getVisibility() != View.GONE) {
+                    view.setVisibility(View.GONE);
+                }
+            }
+        }
+        return success;
+    }
+
+    private static boolean hasUrlSpans (Spanned spanned) {
+        boolean has = false;
+        if (spanned != null){
+            URLSpan[] spans = spanned.getSpans(0, spanned.length(), URLSpan.class);
+            has = spans != null && spans.length > 0;
+        }
+        return has;
+    }
+
+    private static void fixUrlSpans(TextView textView) {
+        CharSequence text = textView.getText();
+        SpannableString spannable = SpannableString.class.isAssignableFrom(text.getClass())
+                ? (SpannableString) text : SpannableString.valueOf(text);
+        URLSpan[] spans = spannable.getSpans(0, spannable.length(), URLSpan.class);
+        for (URLSpan span : spans) {
+            int start = spannable.getSpanStart(span);
+            int end = spannable.getSpanEnd(span);
+            spannable.removeSpan(span);
+            spannable.setSpan(new MyUrlSpan(span.getURL()), start, end, 0);
+        }
+        textView.setText(spannable);
+    }
+
+    public static URLSpan[] getUrlSpans(View view) {
+        if (view != null && TextView.class.isAssignableFrom(view.getClass())) {
+            CharSequence text = ((TextView) view).getText();
+            if (Spanned.class.isAssignableFrom(text.getClass())) {
+                return ((Spanned) text).getSpans(0, text.length(), URLSpan.class);
+            }
+        }
+        return new URLSpan[] {};
+    }
+}

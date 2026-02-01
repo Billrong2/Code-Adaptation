@@ -1,0 +1,82 @@
+
+package com.archimatetool.editor.utils;
+
+
+
+
+
+public final class StringUtils {
+    
+    
+    public final static String ZERO_LENGTH_STRING = ""; 
+
+    
+    public static String safeString(String input) {
+        if(input != null) {
+            return input;
+        }
+
+        return ZERO_LENGTH_STRING;
+    }
+    
+    
+    public static boolean isSet(String input) {
+        return input != null && !ZERO_LENGTH_STRING.equals(input);
+    }
+    
+    
+    public static boolean isSetAfterTrim(String input) {
+        return isSet(input) && input.trim().length() > 0;
+    }
+    
+    
+    public static String getStringCharacters(String s, int amount) {
+        if(amount < 1) {
+            return ""; 
+        }
+        
+        String ret = s;
+        
+        for(int i = 1; i < amount; i++) {
+            ret += s;
+        }
+        
+        return ret;
+    }
+    
+    
+    public static boolean isValidID(String id) {
+        if(!isSet(id)) {
+            return false;
+        }
+        
+        return id.matches("[a-zA-Z_][\\w-_.]*"); 
+    }
+    
+    
+    public static String getValidID(String id) {
+        if(!StringUtils.isSet(id)) {
+            return id;
+        }
+        return id.replaceAll("[^a-zA-Z0-9-]", "_"); 
+    }
+    
+    
+    public static String escapeAmpersandsInText(String text) {
+        if(isSet(text)) {
+            return text.replace("&", "&&");  
+        }
+        return text;
+    }
+    
+    
+    public static String replaceNewLineCharacters(String text, String replace) {
+        if(isSet(text)) {
+            return text.replaceAll("(\r\n|\r|\n)", replace);  
+        }
+        return text;
+    }
+    
+        // TODO
+
+}

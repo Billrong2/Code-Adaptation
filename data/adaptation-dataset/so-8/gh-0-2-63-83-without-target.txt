@@ -1,0 +1,43 @@
+
+
+package info.papdt.blacklight.ui.common;
+
+import android.content.Context;
+import android.content.res.TypedArray;
+import android.graphics.PorterDuff;
+import android.graphics.drawable.Drawable;
+import android.util.AttributeSet;
+import android.widget.ImageView;
+
+import info.papdt.blacklight.R;
+
+
+
+public class TintImageView extends ImageView {
+	
+	public TintImageView(Context context) {
+		this(context, null);
+	}
+
+	public TintImageView(Context context, AttributeSet attrs) {
+		this(context, attrs, 0);
+	}
+
+	public TintImageView(Context context, AttributeSet attrs, int defStyle) {
+		super(context, attrs, defStyle);
+
+		if (attrs != null) {
+			TypedArray arr = context.obtainStyledAttributes(attrs, R.styleable.TintImageView);
+			setColorFilter(arr.getColor(R.styleable.TintImageView_tintColor, 0), PorterDuff.Mode.SRC_IN);
+			arr.recycle();
+		}
+	}
+	
+	
+	public void setColor(int color) {
+		setColorFilter(color, PorterDuff.Mode.SRC_IN);
+	}
+
+	// TODO
+
+}

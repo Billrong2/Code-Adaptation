@@ -1,0 +1,36 @@
+
+package org.ojbc.util.helper;
+
+import org.apache.commons.lang.StringUtils;
+
+
+public class Hash {
+        // TODO
+
+
+    public static String md5(String txt) {
+        return Hash.getHash(txt,"", "MD5");
+    }
+
+    public static String sha1(String txt) {
+        return Hash.getHash(txt, "","SHA1");
+    }
+
+    public static String sha256(String txt) {
+        return Hash.getHash(txt, "","SHA-256");
+    }
+    
+    public static String md5WithSalt(String txt, String salt) {
+        return Hash.getHash(txt,salt, "MD5");
+    }
+
+    public static String sha1WithSalt(String txt, String salt) {
+        return Hash.getHash(txt, salt,"SHA1");
+    }
+
+    public static String sha256WithSalt(String txt, String salt) {
+        return Hash.getHash(txt, salt,"SHA-256");
+    }
+
+    
+}

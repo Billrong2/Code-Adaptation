@@ -1,0 +1,26 @@
+package org.infernus.idea.checkstyle.util;
+
+import org.apache.commons.io.FilenameUtils;
+import org.jetbrains.annotations.NotNull;
+
+import java.io.File;
+import java.util.regex.Pattern;
+
+public final class FilePaths {
+
+    private FilePaths() {
+        
+    }
+
+        // TODO
+
+
+
+    public static class PathResolutionException extends RuntimeException {
+        private static final long serialVersionUID = -8628071255737767040L;
+
+        PathResolutionException(String msg) {
+            super(msg);
+        }
+    }
+}

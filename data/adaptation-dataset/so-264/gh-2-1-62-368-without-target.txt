@@ -1,0 +1,131 @@
+package org.geogebra.desktop.gui.virtualkeyboard;
+
+import java.awt.AWTException;
+import java.awt.Robot;
+import java.awt.event.KeyEvent;
+
+import org.geogebra.common.util.debug.Log;
+
+
+
+
+public class Keyboard {
+
+	protected Robot robot;
+
+	public static void mainx(String... args) throws Exception {
+		Keyboard keyboard = new Keyboard();
+		keyboard.type("Hello there, how are you?");
+	}
+
+	public Keyboard() throws AWTException {
+		this.robot = new Robot();
+	}
+
+	public Keyboard(Robot robot) {
+		this.robot = robot;
+	}
+
+	public void type(CharSequence characters) {
+		int length = characters.length();
+		for (int i = 0; i < length; i++) {
+			char character = characters.charAt(i);
+			type(character);
+		}
+	}
+
+	public void type(boolean altPressed, boolean ctrlPressed,
+			boolean shiftPressed, CharSequence characters) {
+
+		if (altPressed)
+			robot.keyPress(KeyEvent.VK_ALT);
+		if (ctrlPressed)
+			robot.keyPress(KeyEvent.VK_CONTROL);
+		if (shiftPressed)
+			robot.keyPress(KeyEvent.VK_SHIFT);
+
+		int length = characters.length();
+		for (int i = 0; i < length; i++) {
+			char character = characters.charAt(i);
+			type(character);
+		}
+
+		robot.keyRelease(KeyEvent.VK_ALT);
+		robot.keyRelease(KeyEvent.VK_CONTROL);
+		robot.keyRelease(KeyEvent.VK_SHIFT);
+
+	}
+
+	// TODO
+
+
+	/*
+	 * process strings such as <enter>
+	 */
+	public void doType(boolean altPressed, boolean ctrlPressed,
+			boolean shiftPressed, String text) {
+		if (!text.startsWith("<") || !text.endsWith(">")) {
+			type(altPressed, ctrlPressed, shiftPressed, text);
+		} else {
+			if (text.equals("<escape>")) {
+				doType(altPressed, ctrlPressed, shiftPressed,
+						KeyEvent.VK_ESCAPE);
+			} else if (text.equals("<left>")) {
+				doType(altPressed, ctrlPressed, shiftPressed, KeyEvent.VK_LEFT);
+			} else if (text.equals("<right>")) {
+				doType(altPressed, ctrlPressed, shiftPressed, KeyEvent.VK_RIGHT);
+			} else if (text.equals("<up>")) {
+				doType(altPressed, ctrlPressed, shiftPressed, KeyEvent.VK_UP);
+			} else if (text.equals("<down>")) {
+				doType(altPressed, ctrlPressed, shiftPressed, KeyEvent.VK_DOWN);
+			}
+			else if (text.equals("<backspace>")) {
+				doType(altPressed, ctrlPressed, shiftPressed,
+						KeyEvent.VK_BACK_SPACE);
+			}
+			else {
+				Log.debug("unknown keycode:" + text);
+			}
+		}
+
+	}
+
+	public void doType(boolean altPressed, boolean ctrlPressed,
+			boolean shiftPressed, int... keyCodes) {
+
+		if (altPressed)
+			robot.keyPress(KeyEvent.VK_ALT); 
+		if (ctrlPressed)
+			robot.keyPress(KeyEvent.VK_CONTROL);
+		if (shiftPressed)
+			robot.keyPress(KeyEvent.VK_SHIFT);
+
+		doType(keyCodes, 0, keyCodes.length);
+
+		robot.keyRelease(KeyEvent.VK_ALT);
+		robot.keyRelease(KeyEvent.VK_CONTROL);
+		robot.keyRelease(KeyEvent.VK_SHIFT);
+	}
+
+	public void doType(int... keyCodes) {
+		doType(keyCodes, 0, keyCodes.length);
+	}
+
+	public void altPressed(boolean press) {
+		if (press)
+			robot.keyPress(KeyEvent.VK_ALT);
+		else
+			robot.keyRelease(KeyEvent.VK_ALT);
+	}
+
+	private void doType(int[] keyCodes, int offset, int length) {
+		if (length == 0) {
+			return;
+		}
+
+		robot.keyPress(keyCodes[offset]);
+		doType(keyCodes, offset + 1, length - 1);
+		robot.keyRelease(keyCodes[offset]);
+	}
+
+}

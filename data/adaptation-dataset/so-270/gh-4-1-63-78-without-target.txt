@@ -1,0 +1,69 @@
+
+package com.streamsets.pipeline.stage.destination.bigtable;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.lang.reflect.Field;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+
+public class BigtableUtility {
+  private static final Logger LOG = LoggerFactory.getLogger(BigtableUtility.class);
+  private Process process;
+  private static final int PORT = 8279;
+
+  public BigtableUtility() {
+  }
+
+  public void setupEnvironment() {
+
+    
+    try {
+      Runtime.getRuntime().exec("pkill cbtemulator");
+      Thread.sleep(500);
+    } catch (Exception ex) {
+      LOG.info("setupEnvironment: exception pkill'ing or sleeping {}", ex.toString());
+    }
+
+    
+    
+
+    Map<String, String> existing = System.getenv();
+    Map<String, String> newenv = new HashMap<>();
+    newenv.put("BIGTABLE_EMULATOR_HOST", "localhost:8279");
+    newenv.put("GOOGLE_APPLICATION_CREDENTIALS", "/dev/null");
+    newenv.putAll(existing);
+    try {
+      setEnv(newenv);
+    } catch (Exception ex) {
+      LOG.error("exception setting environment {}", ex.toString());
+    }
+  }
+
+    // TODO
+
+
+  public void startEmulator() throws Exception {
+
+    Runtime runTime = Runtime.getRuntime();
+    String[] cmd = {
+        
+        "/Users/bob/google-cloud-sdk/platform/bigtable-emulator/cbtemulator", "--host=localhost", "--port=8279"
+    };
+
+    process = runTime.exec(cmd);
+    Thread.sleep(1000);
+    LOG.info("setupEnvironment: after starting emulator (and a short sleep)");
+
+  }
+
+  public void stopEmulator() {
+    LOG.info("bobp: stopEmulator: got here");
+    if (process != null) {
+      process.destroy();
+    }
+  }
+
+}

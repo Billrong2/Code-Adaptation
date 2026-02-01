@@ -1,0 +1,4 @@
+{
+  "code": "public static Calendar toCalendar(final String iso8601string) throws ParseException{\n    Calendar calendar = GregorianCalendar.getInstance();\n    String s = iso8601string.replace(\"Z\", \"+00:00\");\n    try{\n        s = s.substring(0, 22) + s.substring(23);\n    }catch(IndexOutOfBoundsException e){\n        throw new ParseException(\"Invalid length\", 0);\n    }\n    Date date = new SimpleDateFormat(\"yyyy-MM-dd'T'HH:mm:ssZ\").parse(s);\n    calendar.setTime(date);\n    return calendar;\n}",
+  "explanation": "code_hardening: none\nresolve_compilation_errors: none\nexception_handling: none\nlogic_customization: none\nrefactoring: none\nmisc: Reformatted braces and indentation to match the requested style (no space before opening braces) and removed the inline comment on the substring line while keeping the statement identical."
+}

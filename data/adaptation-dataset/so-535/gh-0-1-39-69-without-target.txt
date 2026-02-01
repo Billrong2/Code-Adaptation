@@ -1,0 +1,17 @@
+
+package sernet.gs.service;
+
+import java.util.Map;
+
+
+public final class MapUtil {
+
+ 
+    
+    private MapUtil() {
+    }
+    
+        // TODO
+
+
+}

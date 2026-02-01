@@ -1,0 +1,103 @@
+
+
+package slash.common.io;
+
+import java.io.*;
+
+import static slash.common.io.Files.getExtension;
+
+
+public class WindowsShortcut {
+    private static final int MINIMUM_LENGTH = 0x64;
+
+    private String realFileName;
+    private boolean directory, local;
+
+    
+    public static boolean isPotentialValidLink(File file) throws IOException {
+        if (!file.isFile() || !getExtension(file).equals(".lnk"))
+            return false;
+
+        try (InputStream inputStream = new FileInputStream(file)) {
+            return inputStream.available() >= MINIMUM_LENGTH && isMagicPresent(getBytes(inputStream, 32));
+        }
+    }
+
+    public WindowsShortcut(File file) throws IOException {
+        try (InputStream inputStream = new FileInputStream(file)) {
+            parseLink(getBytes(inputStream));
+        }
+    }
+
+    
+    public String getRealFilename() {
+        return realFileName;
+    }
+
+    
+    public boolean isLocal() {
+        return local;
+    }
+
+    
+    public boolean isDirectory() {
+        return directory;
+    }
+
+    public boolean isFile() {
+        return !isDirectory();
+    }
+
+    
+    private static byte[] getBytes(InputStream in) throws IOException {
+        return getBytes(in, null);
+    }
+
+    
+    private static byte[] getBytes(InputStream in, Integer max) throws IOException {
+        
+        ByteArrayOutputStream bout = new ByteArrayOutputStream();
+        byte[] buff = new byte[256];
+        while (max == null || max > 0) {
+            int n = in.read(buff);
+            if (n == -1) {
+                break;
+            }
+            bout.write(buff, 0, n);
+            if (max != null)
+                max -= n;
+        }
+        in.close();
+        return bout.toByteArray();
+    }
+
+    private static boolean isMagicPresent(byte[] link) {
+        final int magic = 0x0000004C;
+        final int magic_offset = 0x00;
+        return link.length >= 32 && bytesToDword(link, magic_offset) == magic;
+    }
+
+        // TODO
+
+
+    private static String getNullDelimitedString(byte[] bytes, int off) {
+        int len = 0;
+        
+        while (true) {
+            if (bytes[off + len] == 0) {
+                break;
+            }
+            len++;
+        }
+        return new String(bytes, off, len);
+    }
+
+    
+    private static int bytesToWord(byte[] bytes, int off) {
+        return ((bytes[off + 1] & 0xff) << 8) | (bytes[off] & 0xff);
+    }
+
+    private static int bytesToDword(byte[] bytes, int off) {
+        return (bytesToWord(bytes, off + 2) << 16) | bytesToWord(bytes, off);
+    }
+}

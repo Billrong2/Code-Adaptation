@@ -1,0 +1,10 @@
+package com.adamrosenfield.wordswithcrosses.net.derstandard;
+
+import java.util.Calendar;
+
+public final class DateUtil {
+    private DateUtil() {throw new RuntimeException(); }
+    
+        // TODO
+
+}

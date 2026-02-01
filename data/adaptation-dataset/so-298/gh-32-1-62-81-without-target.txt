@@ -1,0 +1,56 @@
+package ch.epfl.bbp;
+
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+
+public class MapUtils {
+
+    
+    public static <K, V extends Comparable<V>> K keyOfHighestValue(Map<K, V> map) {
+        K bestKey = null;
+        V bestValue = null;
+        for (Entry<K, V> entry : map.entrySet()) {
+            if (bestValue == null || entry.getValue().compareTo(bestValue) > 0) {
+                bestKey = entry.getKey();
+                bestValue = entry.getValue();
+            }
+        }
+        return bestKey;
+    }
+
+    
+    public static <K, V extends Comparable<V>> LinkedHashMap<K, V> keysOfHighestValues(
+            Map<K, V> map, int topN) {
+        return keysOfHighestValues(map, topN, true);
+    }
+
+    public static <K, V extends Comparable<V>> LinkedHashMap<K, V> keysOfHighestValues(
+            Map<K, V> map, int topN, final boolean reverse) {
+
+        LinkedHashMap<K, V> best = new LinkedHashMap<K, V>(topN);
+        Iterator<Entry<K, V>> sortedByValueIt = sortByValue(map, reverse)
+                .entrySet().iterator();
+
+        while (sortedByValueIt.hasNext() && topN > 0) {
+            Map.Entry<K, V> entry = sortedByValueIt.next();
+            best.put(entry.getKey(), entry.getValue());
+            topN--;
+        }
+        return best;
+    }
+
+    
+    public static <K, V extends Comparable<? super V>> Map<K, V> sortByValue(
+            Map<K, V> map) {
+        return sortByValue(map, false);
+    }
+
+    // TODO
+
+}

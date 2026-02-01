@@ -1,0 +1,30 @@
+
+package com.noctarius.borabora.spi.io;
+
+
+final class HalfPrecision {
+
+    
+    static float toFloat(int hbits) {
+        
+        int exp = (hbits >> 10) & 0x1f;
+        int mant = hbits & 0x3ff;
+
+        double val;
+        if (exp == 0) {
+            val = mant * Math.pow(2, -24);
+        } else if (exp != 31) {
+            val = (mant + 1024) * Math.pow(2, exp - 25);
+        } else if (mant != 0) {
+            val = Double.NaN;
+        } else {
+            val = Double.POSITIVE_INFINITY;
+        }
+
+        return (float) (((hbits & 0x8000) == 0) ? val : -val);
+    }
+
+        // TODO
+
+
+}

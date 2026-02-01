@@ -1,0 +1,72 @@
+package com.schneeloch.bostonbusmap_library.math;
+
+
+public class Geometry {
+	
+	
+	private static final double radiusOfEarthInKilo = 6371.2;
+	private static final double kilometersPerMile = 1.609344;
+	
+	
+	private static final double radiusOfEarthInMiles = radiusOfEarthInKilo / kilometersPerMile;
+
+	public static final double degreesToRadians = java.lang.Math.PI / 180.0;
+
+	public static final double radiansToDegrees = 180.0 / java.lang.Math.PI;
+
+	private static final double InvPITimes180 = (1.0 / Math.PI) * 180;
+    public static final double milesToMeters = 1609.34;
+
+    
+	public static float computeCompareDistanceFloat(float lat1, float lon1, float lat2, float lon2)
+	{
+		
+		
+		float dist = (float)(((1.0f - Math.cos(lat1 - lat2)) * 0.5f) + Math.cos(lat1) * Math.cos(lat2) *
+				((1.0f - Math.cos(lon1 - lon2)) * 0.5f));
+		return dist * (float)radiusOfEarthInMiles;
+	}
+
+	
+	public static float computeCompareDistance(double lat1, double lon1, double lat2, double lon2)
+	{
+		
+		double dist = ((1.0 - Math.cos(lat1 - lat2)) * 0.5) + (Math.cos(lat1) * Math.cos(lat2) * 
+				((1.0 - Math.cos(lon1 - lon2)) * 0.5)); 
+		return (float) (dist * radiusOfEarthInMiles);
+	}
+
+	public static int getDegreesFromSlope(double y, double x)
+	{
+		double thetaInRadians = Math.atan2(y, x);
+		
+		int degrees = mathRadiansToDegrees(thetaInRadians);
+		return degrees;
+	}
+	
+	
+	public static int mathRadiansToDegrees(double thetaAsRadians)
+	{
+		
+		int degrees = (int)(thetaAsRadians * InvPITimes180);
+		if (degrees < 0)
+		{
+			degrees += 360;
+		}
+		
+		
+		degrees = -degrees + 90;
+		if (degrees < 0)
+		{
+			degrees += 360;
+		}
+		
+		return degrees;
+	}
+
+		// TODO
+
+
+
+	
+}

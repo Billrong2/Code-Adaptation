@@ -1,0 +1,330 @@
+package com.journeyapps.barcodescanner;
+
+import android.Manifest;
+import android.annotation.TargetApi;
+import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.DialogInterface;
+import android.content.Intent;
+import android.content.pm.ActivityInfo;
+import android.content.pm.PackageManager;
+import android.content.res.Configuration;
+import android.graphics.Bitmap;
+import android.os.Build;
+import android.os.Bundle;
+import android.os.Handler;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
+import android.util.Log;
+import android.view.Display;
+import android.view.Surface;
+import android.view.Window;
+import android.view.WindowManager;
+
+import com.google.zxing.ResultMetadataType;
+import com.google.zxing.ResultPoint;
+import com.google.zxing.client.android.BeepManager;
+import com.google.zxing.client.android.InactivityTimer;
+import com.google.zxing.client.android.Intents;
+import com.google.zxing.client.android.R;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.List;
+import java.util.Map;
+
+
+public class CaptureManager {
+    private static final String TAG = CaptureManager.class.getSimpleName();
+
+    private static int cameraPermissionReqCode = 250;
+
+    private Activity activity;
+    private DecoratedBarcodeView barcodeView;
+    private int orientationLock = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;
+    private static final String SAVED_ORIENTATION_LOCK = "SAVED_ORIENTATION_LOCK";
+    private boolean returnBarcodeImagePath = false;
+
+    private boolean destroyed = false;
+
+    private InactivityTimer inactivityTimer;
+    private BeepManager beepManager;
+
+    private Handler handler;
+
+    private BarcodeCallback callback = new BarcodeCallback() {
+        @Override
+        public void barcodeResult(final BarcodeResult result) {
+            barcodeView.pause();
+            beepManager.playBeepSoundAndVibrate();
+
+            handler.post(new Runnable() {
+                @Override
+                public void run() {
+                    returnResult(result);
+                }
+            });
+
+        }
+
+        @Override
+        public void possibleResultPoints(List<ResultPoint> resultPoints) {
+
+        }
+    };
+
+    private final CameraPreview.StateListener stateListener = new CameraPreview.StateListener() {
+        @Override
+        public void previewSized() {
+
+        }
+
+        @Override
+        public void previewStarted() {
+
+        }
+
+        @Override
+        public void previewStopped() {
+
+        }
+
+        @Override
+        public void cameraError(Exception error) {
+            displayFrameworkBugMessageAndExit();
+        }
+    };
+
+    public CaptureManager(Activity activity, DecoratedBarcodeView barcodeView) {
+        this.activity = activity;
+        this.barcodeView = barcodeView;
+        barcodeView.getBarcodeView().addStateListener(stateListener);
+
+        handler = new Handler();
+
+        inactivityTimer = new InactivityTimer(activity, new Runnable() {
+            @Override
+            public void run() {
+                Log.d(TAG, "Finishing due to inactivity");
+                finish();
+            }
+        });
+
+        beepManager = new BeepManager(activity);
+    }
+
+    
+    public void initializeFromIntent(Intent intent, Bundle savedInstanceState) {
+        Window window = activity.getWindow();
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+
+        if (savedInstanceState != null) {
+            
+            
+            
+            this.orientationLock = savedInstanceState.getInt(SAVED_ORIENTATION_LOCK, ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+        }
+
+        if(intent != null) {
+            
+            boolean orientationLocked = intent.getBooleanExtra(Intents.Scan.ORIENTATION_LOCKED, true);
+            if (orientationLocked) {
+                lockOrientation();
+            }
+
+            if (Intents.Scan.ACTION.equals(intent.getAction())) {
+                barcodeView.initializeFromIntent(intent);
+            }
+
+            if (!intent.getBooleanExtra(Intents.Scan.BEEP_ENABLED, true)) {
+                beepManager.setBeepEnabled(false);
+            }
+
+            if (intent.hasExtra(Intents.Scan.TIMEOUT)) {
+                Runnable runnable = new Runnable() {
+                    @Override
+                    public void run() {
+                        returnResultTimeout();
+                    }
+                };
+                handler.postDelayed(runnable, intent.getLongExtra(Intents.Scan.TIMEOUT, 0L));
+            }
+
+            if (intent.getBooleanExtra(Intents.Scan.BARCODE_IMAGE_ENABLED, false)) {
+                returnBarcodeImagePath = true;
+            }
+        }
+    }
+
+        // TODO
+
+
+    
+    public void decode() {
+        barcodeView.decodeSingle(callback);
+    }
+
+    
+    public void onResume() {
+        if(Build.VERSION.SDK_INT >= 23) {
+            openCameraWithPermission();
+        } else {
+            barcodeView.resume();
+        }
+        inactivityTimer.start();
+    }
+
+    private boolean askedPermission = false;
+
+    @TargetApi(23)
+    private void openCameraWithPermission() {
+        if (ContextCompat.checkSelfPermission(this.activity, Manifest.permission.CAMERA)
+                == PackageManager.PERMISSION_GRANTED) {
+            barcodeView.resume();
+        } else if(!askedPermission) {
+            ActivityCompat.requestPermissions(this.activity,
+                    new String[]{Manifest.permission.CAMERA},
+                    cameraPermissionReqCode);
+            askedPermission = true;
+        } else {
+            
+        }
+    }
+
+    
+    public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
+        if(requestCode == cameraPermissionReqCode) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                
+                barcodeView.resume();
+            } else {
+                
+                displayFrameworkBugMessageAndExit();
+            }
+        }
+    }
+
+    
+    public void onPause() {
+        barcodeView.pause();
+
+        inactivityTimer.cancel();
+    }
+
+    
+    public void onDestroy() {
+        destroyed = true;
+        inactivityTimer.cancel();
+    }
+
+    
+    public void onSaveInstanceState(Bundle outState) {
+        outState.putInt(SAVED_ORIENTATION_LOCK, this.orientationLock);
+    }
+
+    
+    public static Intent resultIntent(BarcodeResult rawResult, String barcodeImagePath) {
+        Intent intent = new Intent(Intents.Scan.ACTION);
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_WHEN_TASK_RESET);
+        intent.putExtra(Intents.Scan.RESULT, rawResult.toString());
+        intent.putExtra(Intents.Scan.RESULT_FORMAT, rawResult.getBarcodeFormat().toString());
+        byte[] rawBytes = rawResult.getRawBytes();
+        if (rawBytes != null && rawBytes.length > 0) {
+            intent.putExtra(Intents.Scan.RESULT_BYTES, rawBytes);
+        }
+        Map<ResultMetadataType, ?> metadata = rawResult.getResultMetadata();
+        if (metadata != null) {
+            if (metadata.containsKey(ResultMetadataType.UPC_EAN_EXTENSION)) {
+                intent.putExtra(Intents.Scan.RESULT_UPC_EAN_EXTENSION,
+                        metadata.get(ResultMetadataType.UPC_EAN_EXTENSION).toString());
+            }
+            Number orientation = (Number) metadata.get(ResultMetadataType.ORIENTATION);
+            if (orientation != null) {
+                intent.putExtra(Intents.Scan.RESULT_ORIENTATION, orientation.intValue());
+            }
+            String ecLevel = (String) metadata.get(ResultMetadataType.ERROR_CORRECTION_LEVEL);
+            if (ecLevel != null) {
+                intent.putExtra(Intents.Scan.RESULT_ERROR_CORRECTION_LEVEL, ecLevel);
+            }
+            @SuppressWarnings("unchecked")
+            Iterable<byte[]> byteSegments = (Iterable<byte[]>) metadata.get(ResultMetadataType.BYTE_SEGMENTS);
+            if (byteSegments != null) {
+                int i = 0;
+                for (byte[] byteSegment : byteSegments) {
+                    intent.putExtra(Intents.Scan.RESULT_BYTE_SEGMENTS_PREFIX + i, byteSegment);
+                    i++;
+                }
+            }
+        }
+        if (barcodeImagePath != null) {
+            intent.putExtra(Intents.Scan.RESULT_BARCODE_IMAGE_PATH, barcodeImagePath);
+        }
+        return intent;
+    }
+
+    
+    private String getBarcodeImagePath(BarcodeResult rawResult) {
+        String barcodeImagePath = null;
+        if (returnBarcodeImagePath) {
+            Bitmap bmp = rawResult.getBitmap();
+            try {
+                File bitmapFile = File.createTempFile("barcodeimage", ".jpg", activity.getCacheDir());
+                FileOutputStream outputStream = new FileOutputStream(bitmapFile);
+                bmp.compress(Bitmap.CompressFormat.JPEG, 100, outputStream);
+                outputStream.close();
+                barcodeImagePath = bitmapFile.getAbsolutePath();
+            } catch (IOException e) {
+                Log.w(TAG, "Unable to create temporary file and store bitmap! " + e);
+            }
+        }
+        return barcodeImagePath;
+    }
+
+    private void finish() {
+        activity.finish();
+    }
+
+    protected void returnResultTimeout() {
+        Intent intent = new Intent(Intents.Scan.ACTION);
+        intent.putExtra(Intents.Scan.TIMEOUT, true);
+        activity.setResult(Activity.RESULT_CANCELED, intent);
+        finish();
+    }
+
+    protected void returnResult(BarcodeResult rawResult) {
+        Intent intent = resultIntent(rawResult, getBarcodeImagePath(rawResult));
+        activity.setResult(Activity.RESULT_OK, intent);
+        finish();
+    }
+
+    protected void displayFrameworkBugMessageAndExit() {
+        if (activity.isFinishing() || this.destroyed) {
+            return;
+        }
+        AlertDialog.Builder builder = new AlertDialog.Builder(activity);
+        builder.setTitle(activity.getString(R.string.zxing_app_name));
+        builder.setMessage(activity.getString(R.string.zxing_msg_camera_framework_bug));
+        builder.setPositiveButton(R.string.zxing_button_ok, new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                finish();
+            }
+        });
+        builder.setOnCancelListener(new DialogInterface.OnCancelListener() {
+            @Override
+            public void onCancel(DialogInterface dialog) {
+                finish();
+            }
+        });
+        builder.show();
+    }
+
+    public static int getCameraPermissionReqCode() {
+        return cameraPermissionReqCode;
+    }
+
+    public static void setCameraPermissionReqCode(int cameraPermissionReqCode) {
+        CaptureManager.cameraPermissionReqCode = cameraPermissionReqCode;
+    }
+}

@@ -1,0 +1,279 @@
+package edu.stanford.nlp.neural;
+
+import edu.stanford.nlp.io.IOUtils;
+import edu.stanford.nlp.math.ArrayMath;
+
+import java.io.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.zip.GZIPOutputStream;
+
+
+public class VectorMap extends HashMap<String, float[]>{
+
+  
+  private enum itype {
+    INT8,
+    INT16,
+    INT32;
+
+    
+    static itype getType(int num) {
+      itype t = itype.INT32;
+      if (num < Short.MAX_VALUE) {
+        t = itype.INT16;
+      }
+      if (num < Byte.MAX_VALUE) {
+        t = itype.INT8;
+      }
+      return t;
+    }
+
+    
+    public int read(DataInputStream in) throws IOException {
+      switch (this) {
+        case INT8:
+          return in.readByte();
+        case INT16:
+          return in.readShort();
+        case INT32:
+          return in.readInt();
+        default:
+          throw new RuntimeException("Unknown itype: " + this);
+      }
+    }
+
+    
+    public void write(DataOutputStream out, int value) throws IOException {
+      switch (this) {
+        case INT8:
+          out.writeByte(value);
+          break;
+        case INT16:
+          out.writeShort(value);
+          break;
+        case INT32:
+          out.writeInt(value);
+          break;
+        default:
+          throw new RuntimeException("Unknown itype: " + this);
+      }
+    }
+
+  }
+
+  
+  public VectorMap() {
+    super(1024);
+  }
+
+  
+  public VectorMap(Map<String, float[]> vectors) {
+    super(vectors);
+  }
+
+
+  
+  public void serialize(String file) throws IOException {
+    try (OutputStream output = new BufferedOutputStream(new FileOutputStream(new File(file)))) {
+      if (file.endsWith(".gz")) {
+        try (GZIPOutputStream gzip = new GZIPOutputStream(output)) {
+          serialize(gzip);
+        }
+      } else {
+        serialize(output);
+      }
+    }
+  }
+
+  
+  public void serialize(OutputStream out) throws IOException {
+    DataOutputStream dataOut = new DataOutputStream(out);
+
+    
+    int maxKeyLength = 0;
+    int vectorLength = 0;
+    for (Entry<String, float[]> entry : this.entrySet()) {
+      maxKeyLength = Math.max(entry.getKey().getBytes().length, maxKeyLength);
+      vectorLength = entry.getValue().length;
+    }
+    itype keyIntType = itype.getType(maxKeyLength);
+    
+    dataOut.writeInt(maxKeyLength);
+    
+    dataOut.writeInt(vectorLength);
+
+
+    
+    dataOut.writeInt(this.size());
+
+    for (Map.Entry<String, float[]> entry : this.entrySet()) {
+      
+      byte[] key = entry.getKey().getBytes();
+      keyIntType.write(dataOut, key.length);
+      dataOut.write(key);
+      
+      for (float v : entry.getValue()) {
+        dataOut.writeShort(fromFloat(v));
+      }
+    }
+  }
+
+
+  
+  public static VectorMap deserialize(String file) throws IOException {
+    try (InputStream input = IOUtils.getInputStreamFromURLOrClasspathOrFileSystem(file)) {
+      return deserialize(input);
+    }
+  }
+
+  
+  public static VectorMap deserialize(InputStream in) throws IOException {
+    DataInputStream dataIn = new DataInputStream(in);
+
+    
+    itype keyIntType = itype.getType(dataIn.readInt());
+    
+    int dim = dataIn.readInt();
+    
+    int size = dataIn.readInt();
+
+    
+    VectorMap vectors = new VectorMap();
+    for (int i = 0; i < size; ++i) {
+      
+      int strlen = keyIntType.read(dataIn);
+      byte[] buffer = new byte[strlen];
+      if (dataIn.read(buffer, 0, strlen) != strlen) {
+        throw new IOException("Could not read string buffer fully!");
+      }
+      String key = new String(buffer);
+      
+      float[] vector = new float[dim];
+      for (int k = 0; k < vector.length; ++k) {
+        vector[k] = toFloat(dataIn.readShort());
+      }
+      
+      vectors.put(key, vector);
+    }
+    return vectors;
+  }
+
+
+  
+  public static VectorMap readWord2Vec(String file) {
+    VectorMap vectors = new VectorMap();
+    int dim = -1;
+    for(String line : IOUtils.readLines(file)){
+      String[] split = line.toLowerCase().split("\\s+");
+      if(split.length < 100) continue;
+      float[] vector = new float[split.length-1];
+      if (dim == -1) {
+        dim = vector.length;
+      }
+      assert dim == vector.length;
+      for(int i=1; i < split.length ; i++) {
+        vector[i-1] = Float.parseFloat(split[i]);
+      }
+      ArrayMath.L2normalize(vector);
+      vectors.put(split[0], vector);
+    }
+
+    return vectors;
+  }
+
+  @SuppressWarnings("unchecked")
+  @Override
+  public boolean equals(Object other) {
+    if (other instanceof Map) {
+      try {
+        Map<String, float[]> otherMap = (Map<String, float[]>) other;
+        
+        if (this.keySet().size() != otherMap.keySet().size()) {
+          return false;
+        }
+        
+        for (Entry<String, float[]> entry : this.entrySet()) {
+          float[] otherValue = otherMap.get(entry.getKey());
+          
+          if (otherValue == null && entry.getValue() != null) {
+            return false;
+          }
+          if (otherValue != null && entry.getValue() == null) {
+            return false;
+          }
+          
+          
+          if (entry.getValue() != null && otherValue != null) {
+            
+            if (entry.getValue().length != otherValue.length) {
+              return false;
+            }
+            
+            for (int i = 0; i < otherValue.length; ++i) {
+              if (!sameFloat(entry.getValue()[i], otherValue[i])) {
+                return false;
+              }
+            }
+          }
+        }
+        return true;
+      } catch (ClassCastException e) {
+        e.printStackTrace();
+        return false;
+      }
+    } else {
+      return false;
+    }
+  }
+
+  @Override
+  public int hashCode() {
+    return keySet().hashCode();
+  }
+
+  @Override
+  public String toString() {
+    return "VectorMap[" + this.size() + "]";
+  }
+
+  
+  private static boolean sameFloat(float a, float b) {
+    float absDiff = Math.abs(a - b);
+    float absA = Math.abs(a);
+    float absB = Math.abs(b);
+    return absDiff < 1e-10 ||
+           absDiff < Math.max(absA, absB) / 100.0f ||
+           (absA < 1e-5 && absB < 1e-5);
+  }
+
+    // TODO
+
+
+  
+  private static short fromFloat( float fval ) {
+    int fbits = Float.floatToIntBits( fval );
+    int sign = fbits >>> 16 & 0x8000;          
+    int val = ( fbits & 0x7fffffff ) + 0x1000; 
+
+    if( val >= 0x47800000 )               
+    {                                     
+      if( ( fbits & 0x7fffffff ) >= 0x47800000 )
+      {                                 
+        if( val < 0x7f800000 )        
+          return (short) (sign | 0x7c00);     
+        return (short) (sign | 0x7c00 |        
+            ( fbits & 0x007fffff ) >>> 13); 
+      }
+      return (short) (sign | 0x7bff);             
+    }
+    if( val >= 0x38800000 )               
+      return (short) (sign | val - 0x38000000 >>> 13); 
+    if( val < 0x33000000 )                
+      return (short) sign;                      
+    val = ( fbits & 0x7fffffff ) >>> 23;  
+    return (short) (sign | ( ( fbits & 0x7fffff | 0x800000 ) 
+        + ( 0x800000 >>> val - 102 )     
+        >>> 126 - val ));   
+  }
+}

@@ -1,0 +1,26 @@
+package com.opendoorlogistics.codefromweb;
+
+import javax.swing.JTable;
+import javax.swing.table.TableCellRenderer;
+import javax.swing.table.TableColumn;
+import javax.swing.table.TableColumnModel;
+
+public class PackTableColumn {
+	public static void packAll(JTable table, int margin){
+		packAll(table, margin, 0);
+	}
+	
+	public static void packAll(JTable table, int margin, int minWidth){
+		for(int i =0 ;i<table.getColumnCount() ; i++){
+			PackTableColumn.packColumn(table,i, margin, minWidth);
+		}		
+	}
+	
+	public static void  packColumn(JTable table, int vColIndex, int margin) {
+		packColumn(table, vColIndex, margin, 0);
+	}
+	
+		// TODO
+
+	
+}

@@ -1,0 +1,1012 @@
+
+
+
+
+package eu.asterics.component.processor.openhab;
+
+ 
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSession;
+import javax.net.ssl.X509TrustManager;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.StringReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.X509Certificate;
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.net.ssl.TrustManager;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.InputSource;
+import org.xml.sax.SAXException;
+
+import eu.asterics.mw.data.ConversionUtils;
+import eu.asterics.mw.model.runtime.AbstractRuntimeComponentInstance;
+import eu.asterics.mw.model.runtime.IRuntimeInputPort;
+import eu.asterics.mw.model.runtime.impl.DefaultRuntimeInputPort;
+import eu.asterics.mw.model.runtime.IRuntimeOutputPort;
+import eu.asterics.mw.model.runtime.IRuntimeEventListenerPort;
+import eu.asterics.mw.model.runtime.IRuntimeEventTriggererPort;
+import eu.asterics.mw.model.runtime.impl.DefaultRuntimeOutputPort;
+import eu.asterics.mw.model.runtime.impl.DefaultRuntimeEventTriggererPort;
+import eu.asterics.mw.services.AstericsErrorHandling;
+
+
+public class openHABInstance extends AbstractRuntimeComponentInstance
+{
+	
+	static private String hostname;
+	
+	
+	String port = "8443";
+	
+	
+	String username = "";
+	
+	
+	String password = "";
+	
+	
+	boolean lazyCertificate = true;
+	
+	
+	String protocol = "https";
+	
+	
+	int updateRate = 1000;
+	
+	
+	String item1out = "";
+	
+	String item2out = "";
+	
+	String item3out = "";
+	
+	String item4out = "";
+	
+	String item5out = "";
+	
+	String item6out = "";
+	
+	
+	String item1in = "";
+	
+	String item2in = "";
+	
+	String item3in = "";
+	
+	String item4in = "";
+	
+	String item5in = "";
+	
+	String item6in = "";
+	
+	
+	String item1event = "";
+	
+	String item2event = "";
+	
+	String item3event = "";
+	
+	String item4event = "";
+	
+	String item5event = "";
+	
+	String item6event = "";
+	
+	
+
+	
+	String item1state = null;
+	
+	String item2state = null;
+	
+	String item3state = null;
+	
+	String item4state = null;
+	
+	String item5state = null;
+	
+	String item6state = null;
+	
+	
+	List<String> items;
+	
+	
+	
+	public final IRuntimeOutputPort opItem1 =  new DefaultRuntimeOutputPort();
+	public final IRuntimeOutputPort opItem2 =  new DefaultRuntimeOutputPort();
+	public final IRuntimeOutputPort opItem3 =  new DefaultRuntimeOutputPort();
+	public final IRuntimeOutputPort opItem4 =  new DefaultRuntimeOutputPort();
+	public final IRuntimeOutputPort opItem5 =  new DefaultRuntimeOutputPort();
+	public final IRuntimeOutputPort opItem6 =  new DefaultRuntimeOutputPort();
+	
+	
+	public final IRuntimeEventTriggererPort etpItem1 = new DefaultRuntimeEventTriggererPort();
+	public final IRuntimeEventTriggererPort etpItem2 = new DefaultRuntimeEventTriggererPort();
+	public final IRuntimeEventTriggererPort etpItem3 = new DefaultRuntimeEventTriggererPort();
+	public final IRuntimeEventTriggererPort etpItem4 = new DefaultRuntimeEventTriggererPort();
+	public final IRuntimeEventTriggererPort etpItem5 = new DefaultRuntimeEventTriggererPort();
+	public final IRuntimeEventTriggererPort etpItem6 = new DefaultRuntimeEventTriggererPort();
+	
+	
+	private final TickGenerator tg = new TickGenerator(this);
+	
+   
+    public openHABInstance()
+    {
+    }
+
+    
+    public IRuntimeInputPort getInputPort(String portID)
+    {
+		if ("item1in".equalsIgnoreCase(portID))
+		{
+			return ipItem1;
+		}
+		if ("item2in".equalsIgnoreCase(portID))
+		{
+			return ipItem2;
+		}
+		if ("item3in".equalsIgnoreCase(portID))
+		{
+			return ipItem3;
+		}
+		if ("item4in".equalsIgnoreCase(portID))
+		{
+			return ipItem4;
+		}
+		if ("item5in".equalsIgnoreCase(portID))
+		{
+			return ipItem5;
+		}
+		if ("item6in".equalsIgnoreCase(portID))
+		{
+			return ipItem6;
+		}
+		return null;
+	}
+
+    
+    public IRuntimeOutputPort getOutputPort(String portID)
+	{
+    	if ("item1".equalsIgnoreCase(portID))
+		{
+			return opItem1;
+		}
+		if ("item2".equalsIgnoreCase(portID))
+		{
+			return opItem2;
+		}
+		if ("item3".equalsIgnoreCase(portID))
+		{
+			return opItem3;
+		}
+		if ("item4".equalsIgnoreCase(portID))
+		{
+			return opItem4;
+		}
+		if ("item5".equalsIgnoreCase(portID))
+		{
+			return opItem5;
+		}
+		if ("item6".equalsIgnoreCase(portID))
+		{
+			return opItem6;
+		}
+        return null; 	
+	}
+
+    
+    public IRuntimeEventListenerPort getEventListenerPort(String eventPortID)
+    {  	
+        return null; 	
+    }
+
+    
+    public IRuntimeEventTriggererPort getEventTriggererPort(String eventPortID)
+    {
+    	if("item1changed".equalsIgnoreCase(eventPortID)) {
+    		return etpItem1;
+    	}
+    	if("item2changed".equalsIgnoreCase(eventPortID)) {
+    		return etpItem2;
+    	}
+
+    	if("item3changed".equalsIgnoreCase(eventPortID)) {
+    		return etpItem3;
+    	}
+
+    	if("item4changed".equalsIgnoreCase(eventPortID)) {
+    		return etpItem4;
+    	}
+
+    	if("item5changed".equalsIgnoreCase(eventPortID)) {
+    		return etpItem5;
+    	}
+
+    	if("item6changed".equalsIgnoreCase(eventPortID)) {
+    		return etpItem6;
+    	}
+        return null;
+    }
+		
+    
+    public Object getRuntimePropertyValue(String propertyName)
+    {
+    	
+		if ("updaterate".equalsIgnoreCase(propertyName))
+		{
+			return updateRate;
+		}
+		if ("hostname".equalsIgnoreCase(propertyName))
+		{
+			return hostname;
+		}
+		if ("port".equalsIgnoreCase(propertyName))
+		{
+			return port;
+		}
+		if ("protocol".equalsIgnoreCase(propertyName))
+		{
+			return protocol;
+		}
+		if ("lazyCertificates".equalsIgnoreCase(propertyName))
+		{
+			return lazyCertificate;
+		}
+		if ("username".equalsIgnoreCase(propertyName))
+		{
+			return username;
+		}
+		if ("password".equalsIgnoreCase(propertyName))
+		{
+			return password;
+		}
+		
+		if ("item1in".equalsIgnoreCase(propertyName))
+		{
+			return item1in;
+		}
+		if ("item2in".equalsIgnoreCase(propertyName))
+		{
+			return item2in;
+		}
+		if ("item3in".equalsIgnoreCase(propertyName))
+		{
+			return item3in;
+		}
+		if ("item4in".equalsIgnoreCase(propertyName))
+		{
+			return item4in;
+		}
+		if ("item5in".equalsIgnoreCase(propertyName))
+		{
+			return item5in;
+		}
+		if ("item6in".equalsIgnoreCase(propertyName))
+		{
+			return item6in;
+		}
+		
+		if ("item1out".equalsIgnoreCase(propertyName))
+		{
+			return item1out;
+		}
+		if ("item2out".equalsIgnoreCase(propertyName))
+		{
+			return item2out;
+		}
+		if ("item3out".equalsIgnoreCase(propertyName))
+		{
+			return item3out;
+		}
+		if ("item4out".equalsIgnoreCase(propertyName))
+		{
+			return item4out;
+		}
+		if ("item5out".equalsIgnoreCase(propertyName))
+		{
+			return item5out;
+		}
+		if ("item6out".equalsIgnoreCase(propertyName))
+		{
+			return item6out;
+		}
+		
+		if ("item1event".equalsIgnoreCase(propertyName))
+		{
+			return item1event;
+		}
+		if ("item2event".equalsIgnoreCase(propertyName))
+		{
+			return item2event;
+		}
+		if ("item3event".equalsIgnoreCase(propertyName))
+		{
+			return item3event;
+		}
+		if ("item4event".equalsIgnoreCase(propertyName))
+		{
+			return item4event;
+		}
+		if ("item5event".equalsIgnoreCase(propertyName))
+		{
+			return item5event;
+		}
+		if ("item6event".equalsIgnoreCase(propertyName))
+		{
+			return item6event;
+		}
+        return null;
+    }
+
+    
+    public Object setRuntimePropertyValue(String propertyName, Object newValue)
+    {
+    	AstericsErrorHandling.instance.reportDebugInfo(null, "SetRuntimeProperty: " + propertyName + " " + newValue);
+    	
+		if ("updaterate".equalsIgnoreCase(propertyName))
+		{
+			final Object oldValue = updateRate;
+			updateRate = Integer.parseInt(newValue.toString());
+			return oldValue;
+		}
+		if ("hostname".equalsIgnoreCase(propertyName))
+		{
+			final Object oldValue = hostname;
+			hostname = newValue.toString();
+			return oldValue;
+		}
+		if ("port".equalsIgnoreCase(propertyName))
+		{
+			final Object oldValue = port;
+			port = newValue.toString();
+			return oldValue;
+		}
+		if ("username".equalsIgnoreCase(propertyName))
+		{
+			final Object oldValue = username;
+			username = newValue.toString();
+			return oldValue;
+		}
+		if ("password".equalsIgnoreCase(propertyName))
+		{
+			final Object oldValue = password;
+			password = newValue.toString();
+			return oldValue;
+		}
+		if ("protocol".equalsIgnoreCase(propertyName))
+		{
+			final Object oldValue = protocol;
+			protocol = newValue.toString();
+			return oldValue;
+		}
+		if ("lazyCertificates".equalsIgnoreCase(propertyName))
+		{
+			final Object oldValue = lazyCertificate;
+			if("true".equalsIgnoreCase((String) newValue))
+			{
+				lazyCertificate = true;
+			} else {
+				lazyCertificate = false;
+			}
+			return oldValue;
+		}
+		
+		if ("item1in".equalsIgnoreCase(propertyName))
+		{
+			final Object oldValue = item1in;
+			item1in = newValue.toString();
+			return oldValue;
+		}
+		if ("item2in".equalsIgnoreCase(propertyName))
+		{
+			final Object oldValue = item2in;
+			item2in = newValue.toString();
+			return oldValue;
+		}
+		if ("item3in".equalsIgnoreCase(propertyName))
+		{
+			final Object oldValue = item3in;
+			item3in = newValue.toString();
+			return oldValue;
+		}
+		if ("item4in".equalsIgnoreCase(propertyName))
+		{
+			final Object oldValue = item4in;
+			item4in = newValue.toString();
+			return oldValue;
+		}
+		if ("item5in".equalsIgnoreCase(propertyName))
+		{
+			final Object oldValue = item5in;
+			item5in = newValue.toString();
+			return oldValue;
+		}
+		if ("item6in".equalsIgnoreCase(propertyName))
+		{
+			final Object oldValue = item6in;
+			item6in = newValue.toString();
+			return oldValue;
+		}
+		
+		if ("item1out".equalsIgnoreCase(propertyName))
+		{
+			final Object oldValue = item1out;
+			item1out = newValue.toString();
+			return oldValue;
+		}
+		if ("item2out".equalsIgnoreCase(propertyName))
+		{
+			final Object oldValue = item2out;
+			item2out = newValue.toString();
+			return oldValue;
+		}
+		if ("item3out".equalsIgnoreCase(propertyName))
+		{
+			final Object oldValue = item3out;
+			item3out = newValue.toString();
+			return oldValue;
+		}
+		if ("item4out".equalsIgnoreCase(propertyName))
+		{
+			final Object oldValue = item4out;
+			item4out = newValue.toString();
+			return oldValue;
+		}
+		if ("item5out".equalsIgnoreCase(propertyName))
+		{
+			final Object oldValue = item5out;
+			item5out = newValue.toString();
+			return oldValue;
+		}
+		if ("item6out".equalsIgnoreCase(propertyName))
+		{
+			final Object oldValue = item6out;
+			item6out = newValue.toString();
+			return oldValue;
+		}
+		
+		if ("item1event".equalsIgnoreCase(propertyName))
+		{
+			final Object oldValue = item1event;
+			item1event = newValue.toString();
+			return oldValue;
+		}
+		if ("item2event".equalsIgnoreCase(propertyName))
+		{
+			final Object oldValue = item2event;
+			item2event = newValue.toString();
+			return oldValue;
+		}
+		if ("item3event".equalsIgnoreCase(propertyName))
+		{
+			final Object oldValue = item3event;
+			item3event = newValue.toString();
+			return oldValue;
+		}
+		if ("item4event".equalsIgnoreCase(propertyName))
+		{
+			final Object oldValue = item4event;
+			item4event = newValue.toString();
+			return oldValue;
+		}
+		if ("item5event".equalsIgnoreCase(propertyName))
+		{
+			final Object oldValue = item5event;
+			item5event = newValue.toString();
+			return oldValue;
+		}
+		if ("item6event".equalsIgnoreCase(propertyName))
+		{
+			final Object oldValue = item6event;
+			item6event = newValue.toString();
+			return oldValue;
+		}
+
+        return null;
+    }
+
+
+	
+	private final IRuntimeInputPort ipItem1  = new DefaultRuntimeInputPort()
+	{
+		public void receiveData(byte[] data)
+		{
+			String state = ConversionUtils.stringFromBytes(data);
+			if(item1in != "") {
+				setItemState(item1in,state);
+				AstericsErrorHandling.instance.reportDebugInfo(null, "new state for item1("+ item1in + "):" + state);
+			}
+		}
+
+	};
+	
+	private final IRuntimeInputPort ipItem2  = new DefaultRuntimeInputPort()
+	{
+		public void receiveData(byte[] data)
+		{
+			String state = ConversionUtils.stringFromBytes(data);
+			if(item2in != "") {
+				setItemState(item2in,state);
+				AstericsErrorHandling.instance.reportDebugInfo(null, "new state for item2("+ item2in + "):" + state);
+			}
+		}
+
+	};
+	
+	private final IRuntimeInputPort ipItem3  = new DefaultRuntimeInputPort()
+	{
+		public void receiveData(byte[] data)
+		{
+			String state = ConversionUtils.stringFromBytes(data);
+			if(item3in != "") {
+				setItemState(item3in,state);
+				AstericsErrorHandling.instance.reportDebugInfo(null, "new state for item3("+ item3in + "):" + state);
+			}
+		}
+
+	};
+	
+	private final IRuntimeInputPort ipItem4  = new DefaultRuntimeInputPort()
+	{
+		public void receiveData(byte[] data)
+		{
+			String state = ConversionUtils.stringFromBytes(data);
+			if(item4in != "") {
+				setItemState(item4in,state);
+				AstericsErrorHandling.instance.reportDebugInfo(null, "new state for item4("+ item4in + "):" + state);
+			}
+		}
+
+	};
+	
+	private final IRuntimeInputPort ipItem5  = new DefaultRuntimeInputPort()
+	{
+		public void receiveData(byte[] data)
+		{
+			String state = ConversionUtils.stringFromBytes(data);
+			if(item5in != "") {
+				setItemState(item5in,state);
+				AstericsErrorHandling.instance.reportDebugInfo(null, "new state for item5("+ item5in + "):" + state);
+			}
+		}
+
+	};
+
+	
+	private final IRuntimeInputPort ipItem6  = new DefaultRuntimeInputPort()
+	{
+		public void receiveData(byte[] data)
+		{
+			String state = ConversionUtils.stringFromBytes(data);
+			if(item6in != "") {
+				setItemState(item6in,state);
+				AstericsErrorHandling.instance.reportDebugInfo(null, "new state for item6("+ item6in + "):" + state);
+			}
+		}
+
+	};
+	
+	
+	private final IRuntimeInputPort ipActionString  = new DefaultRuntimeInputPort()
+	{
+		public void receiveData(byte[] data)
+		{
+			String state = ConversionUtils.stringFromBytes(data);
+			AstericsErrorHandling.instance.reportError(null, "ActionString not implemented yet...");
+		}
+
+	};
+     
+      @Override
+      public void start()
+      {
+    	  AstericsErrorHandling.instance.reportDebugInfo(this, "Connecting to openHAB:");
+    	  AstericsErrorHandling.instance.reportDebugInfo(this, "Host: " + hostname + ":" + port);
+    	  AstericsErrorHandling.instance.reportDebugInfo(this, "Username: " + username);
+    	  AstericsErrorHandling.instance.reportDebugInfo(this, "Password: " + password);
+    	  AstericsErrorHandling.instance.reportDebugInfo(this, "Protocol: " + protocol);
+    	  AstericsErrorHandling.instance.reportDebugInfo(this, "Using lazyCertificates: " + lazyCertificate);
+    	  
+    	  this.items = getItems();
+
+    	  if(items.isEmpty())
+    	  {
+    		  AstericsErrorHandling.instance.reportError(this, "Could not find openHAB on host "+ openHABInstance.hostname +" Please verify that openHAB is running and there is no firewall related issue");
+    		  return;
+    	  }
+          super.start();
+          tg.start();
+      }
+
+     
+      @Override
+      public void pause()
+      {
+          super.pause();
+          tg.stop();
+      }
+
+     
+      @Override
+      public void resume()
+      {
+          super.resume();
+          tg.start();
+      }
+
+     
+      @Override
+      public void stop()
+      {
+          super.stop();
+          tg.stop();
+      }
+      
+      public List<String> getSitemaps() {
+  		return getList(protocol+"://"+hostname+":"+port,"sitemap");
+  	}
+  	
+
+  	public List<String> getItems() {
+  		return getList(protocol+"://"+hostname+":"+port,"item");
+  	}
+  	
+  	public String getItemState(String item) {
+  		try {
+  			AstericsErrorHandling.instance.reportDebugInfo(this, "Get item (name: " + item + ": " + protocol+"://"+hostname+":"+ port + "/rest/items/" + item + "/state");
+  			return httpGet(protocol+"://"+hostname+":"+ port + "/rest/items/" + item + "/state");
+  		} catch (KeyManagementException e) {
+  			tg.stop();
+  			AstericsErrorHandling.instance.reportError(this, "KeyManagement exception, try to use lazyCertificate option (property)");
+  		} catch (NoSuchAlgorithmException e) {
+  			tg.stop();
+  			AstericsErrorHandling.instance.reportError(this, "Algortihm exception, please contact the AsTeRICS team");
+  		} catch (IOException e) {
+  			tg.stop();
+  			
+  			if(e.getMessage().equalsIgnoreCase("Not Found"))
+  			{
+  				AstericsErrorHandling.instance.reportError(this, "Item name '" + item + "' not found, please update your model (HTTP 404)");
+  			} else {
+  				AstericsErrorHandling.instance.reportError(this, "Can't connect/transmit to openHAB instance, please check for a running openHAB and try to use it via the browser (username/password may be wrong),\n message: " + e.getMessage());
+  			}
+  		}
+  		return "";
+  	}
+  	
+  	public String setItemState(String item, String state) {
+  		
+  		
+  		try {
+  			AstericsErrorHandling.instance.reportDebugInfo(this, "Set item (name: " + item + ",state: " + state + "):" + protocol+"://"+hostname+":"+ port + "/CMD?" + item + "=" + state);
+  			return httpGet(protocol+"://"+hostname+":"+ port + "/CMD?" + item + "=" + state);
+  		} catch (KeyManagementException e) {
+  			tg.stop();
+  			AstericsErrorHandling.instance.reportError(this, "KeyManagement exception, try to use lazyCertificate option (property)");
+  		} catch (NoSuchAlgorithmException e) {
+  			tg.stop();
+  			AstericsErrorHandling.instance.reportError(this, "Algortihm exception, please contact the AsTeRICS team");
+  		} catch (IOException e) {
+  			tg.stop();
+  			if(e.getMessage().equalsIgnoreCase("Not Found"))
+  			{
+  				AstericsErrorHandling.instance.reportError(this, "Item name '" + item +"' not found, please update your model (HTTP 404)");
+  			} else {
+  				AstericsErrorHandling.instance.reportError(this, "Can't connect/transmit to openHAB instance, please check for a running openHAB and try to use it via the browser (username/password may be wrong),\n message: " + e.getMessage());
+  			}
+  		}
+  		return "";
+  	}
+  	
+  	public List<String> getList(String hostname,String type) {
+  		List<String> response = new ArrayList<String>();
+  		
+  		try {
+  			
+  			DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
+  			DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
+  			
+  			AstericsErrorHandling.instance.reportDebugInfo(this, "Get list (type: " + type + ": " + hostname + "/rest/" + type + "s");
+  			InputSource is = new InputSource( new StringReader( httpGet(hostname + "/rest/" + type + "s") ) );
+  			Document doc = dBuilder.parse(is);
+  			
+  			NodeList nodes = doc.getElementsByTagName(type);
+  				
+  			
+  			for(int i = 0; i< nodes.getLength(); i++)
+  			{
+  				Node item = nodes.item(i);
+  				Element element = (Element) item;
+  				String name = element.getElementsByTagName("name").item(0).getChildNodes().item(0).getNodeValue();
+  				
+  				response.add(name);
+  			}
+  		} catch (SAXException e) {
+  			tg.stop();
+  			AstericsErrorHandling.instance.reportError(this, "SAX exception, unable to parse the openHAB data, maybe a transmission error?");
+  		} catch (IOException e) {
+  			tg.stop();
+  			AstericsErrorHandling.instance.reportError(this, "Can't connect/transmit to openHAB instance, please check for a running openHAB and try to use it via the browser (username/password may be wrong),\n message: " + e.getMessage());
+  		} catch (ParserConfigurationException e) {
+  			tg.stop();
+  			AstericsErrorHandling.instance.reportError(this, "Parser exception, unable to parse the openHAB data, maybe a transmission error?");
+  		} catch (KeyManagementException e) {
+  			tg.stop();
+  			AstericsErrorHandling.instance.reportError(this, "KeyManagement exception, try to use lazyCertificate option (property)");
+  		} catch (NoSuchAlgorithmException e) {
+  			tg.stop();
+  			AstericsErrorHandling.instance.reportError(this, "Algortihm exception, please contact the AsTeRICS team");
+  		}
+  		
+  		return response;
+  	}
+  	
+  	public String httpGet(String urlStr) throws IOException, KeyManagementException, NoSuchAlgorithmException {
+  		
+  		
+  		if(lazyCertificate == true) {
+  			
+  		    HttpsURLConnection.setDefaultHostnameVerifier(hostnameValid);
+  		    
+  		    TrustManager[] trustAllCerts = new TrustManager[] {
+  		    	       new X509TrustManager() {
+  		    	          public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+  		    	            return null;
+  		    	          }
+
+  		    	          public void checkClientTrusted(X509Certificate[] certs, String authType) {  }
+
+  		    	          public void checkServerTrusted(X509Certificate[] certs, String authType) {  }
+
+  		    	       }
+  		    	    };
+  		    
+  		    SSLContext sc = SSLContext.getInstance("SSL");
+  		    sc.init(null, trustAllCerts, new java.security.SecureRandom());
+  		    HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
+  		}
+  		System.setProperty("sun.security.ssl.allowUnsafeRenegotiation", "true");
+  		  URL url = new URL(urlStr);
+  		  HttpURLConnection conn =
+  		      (HttpURLConnection) url.openConnection();
+  		  
+  		  
+  		  if(this.username.length() != 0) {
+  			  String userPassword = username + ":" + password;
+  			  String passphraseEncoded = MyBase64.encode(userPassword.getBytes());
+  			  
+  			  conn.setRequestProperty("Authorization", "Basic " + passphraseEncoded);
+  			  conn.connect();
+  		  }
+  		  
+  		  if (conn.getResponseCode() != 200) {
+  		    throw new IOException(conn.getResponseMessage());
+  		  }
+
+  		  
+  		  BufferedReader rd = new BufferedReader(
+  		      new InputStreamReader(conn.getInputStream()));
+  		  StringBuilder sb = new StringBuilder();
+  		  String line;
+  		  while ((line = rd.readLine()) != null) {
+  		    sb.append(line);
+  		  }
+  		  rd.close();
+
+  		  conn.disconnect();
+  		  return sb.toString();
+  		}
+  	
+  	
+  	public static class MyBase64 {
+
+  	    private final static char[] ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/".toCharArray();
+
+  	    private static int[]  toInt   = new int[128];
+
+  	    static {
+  	        for(int i=0; i< ALPHABET.length; i++){
+  	            toInt[ALPHABET[i]]= i;
+  	        }
+  	    }
+
+  	      	    // TODO
+
+
+  	    
+  	    public static byte[] decode(String s){
+  	        int delta = s.endsWith( "==" ) ? 2 : s.endsWith( "=" ) ? 1 : 0;
+  	        byte[] buffer = new byte[s.length()*3/4 - delta];
+  	        int mask = 0xFF;
+  	        int index = 0;
+  	        for(int i=0; i< s.length(); i+=4){
+  	            int c0 = toInt[s.charAt( i )];
+  	            int c1 = toInt[s.charAt( i + 1)];
+  	            buffer[index++]= (byte)(((c0 << 2) | (c1 >> 4)) & mask);
+  	            if(index >= buffer.length){
+  	                return buffer;
+  	            }
+  	            int c2 = toInt[s.charAt( i + 2)];
+  	            buffer[index++]= (byte)(((c1 << 4) | (c2 >> 2)) & mask);
+  	            if(index >= buffer.length){
+  	                return buffer;
+  	            }
+  	            int c3 = toInt[s.charAt( i + 3 )];
+  	            buffer[index++]= (byte)(((c2 << 6) | c3) & mask);
+  	        }
+  	        return buffer;
+  	    } 
+
+  	}
+  	
+  	
+  	static HostnameVerifier hostnameValid = new HostnameVerifier() {
+          public boolean verify(String hostnameToVerify, SSLSession session) {
+          	if(hostnameToVerify.equals(hostname)) {
+          		return true;
+          	} else {
+          		return false;
+          	}
+          }
+  	};
+
+  	
+	public void fetchState() {
+		String s;
+		AstericsErrorHandling.instance.reportDebugInfo(this, "Fetching data, updateRate: " + updateRate);
+		
+		if(item1out != "")
+		{
+			s= getItemState(item1out);
+			opItem1.sendData(s.getBytes());
+			AstericsErrorHandling.instance.reportDebugInfo(this, "Item1 state: " + s);
+		}
+		if(item2out != "")
+		{
+			s= getItemState(item2out);
+			opItem2.sendData(s.getBytes());
+			AstericsErrorHandling.instance.reportDebugInfo(this, "Item2 state: " + s);
+		}
+		if(item3out != "")
+		{
+			s= getItemState(item3out);
+			opItem3.sendData(s.getBytes());
+			AstericsErrorHandling.instance.reportDebugInfo(this, "Item3 state: " + s);
+		}
+		if(item4out != "")
+		{
+			s= getItemState(item4out);
+			opItem4.sendData(s.getBytes());
+			AstericsErrorHandling.instance.reportDebugInfo(this, "Item4 state: " + s);
+		}
+		if(item5out != "")
+		{
+			s= getItemState(item5out);
+			opItem5.sendData(s.getBytes());
+			AstericsErrorHandling.instance.reportDebugInfo(this, "Item5 state: " + s);
+		}
+		if(item6out != "")
+		{
+			s= getItemState(item6out);
+			opItem6.sendData(s.getBytes());
+			AstericsErrorHandling.instance.reportDebugInfo(this, "Item6 state: " + s);
+		}
+		
+		
+		if(item1event != "")
+		{
+			s = getItemState(item1event);
+			if(item1state == null)
+			{
+				AstericsErrorHandling.instance.reportDebugInfo(this, "Item1Event initial state: " + s);
+				item1state = s;
+			} else {
+				if(!s.equals(item1state))
+				{
+					AstericsErrorHandling.instance.reportDebugInfo(this, "Item1Event raise event state: " + s);
+					etpItem1.raiseEvent();
+					item1state = s;
+				}
+			}
+		}
+		if(item2event != "")
+		{
+			s = getItemState(item2event);
+			if(item2state == null)
+			{
+				AstericsErrorHandling.instance.reportDebugInfo(this, "Item2Event initial state: " + s);
+				item2state = s;
+			} else {
+				if(!s.equals(item2state))
+				{
+					AstericsErrorHandling.instance.reportDebugInfo(this, "Item2Event raise event state: " + s);
+					etpItem2.raiseEvent();
+					item2state = s;
+				}
+			}
+		}
+		if(item3event != "")
+		{
+			s = getItemState(item3event);
+			if(item3state == null)
+			{
+				AstericsErrorHandling.instance.reportDebugInfo(this, "Item3Event initial state: " + s);
+				item3state = s;
+			} else {
+				if(!s.equals(item3state))
+				{
+					AstericsErrorHandling.instance.reportDebugInfo(this, "Item3Event raise event state: " + s);
+					etpItem3.raiseEvent();
+					item3state = s;
+				}
+			}
+		}
+		if(item4event != "")
+		{
+			s = getItemState(item4event);
+			if(item4state == null)
+			{
+				AstericsErrorHandling.instance.reportDebugInfo(this, "Item4Event initial state: " + s);
+				item4state = s;
+			} else {
+				if(!s.equals(item4state))
+				{
+					AstericsErrorHandling.instance.reportDebugInfo(this, "Item4Event raise event state: " + s);
+					etpItem4.raiseEvent();
+					item4state = s;
+				}
+			}
+		}
+		if(item5event != "")
+		{
+			s = getItemState(item5event);
+			if(item5state == null)
+			{
+				AstericsErrorHandling.instance.reportDebugInfo(this, "Item5Event initial state: " + s);
+				item5state = s;
+			} else {
+				if(!s.equals(item5state))
+				{
+					AstericsErrorHandling.instance.reportDebugInfo(this, "Item5Event raise event state: " + s);
+					etpItem5.raiseEvent();
+					item5state = s;
+				}
+			}
+		}
+		if(item6event != "")
+		{
+			s = getItemState(item6event);
+			if(item6state == null)
+			{
+				AstericsErrorHandling.instance.reportDebugInfo(this, "Item6Event initial state: " + s);
+				item6state = s;
+			} else {
+				if(!s.equals(item6state))
+				{
+					AstericsErrorHandling.instance.reportDebugInfo(this, "Item6Event raise event state: " + s);
+					etpItem6.raiseEvent();
+					item6state = s;
+				}
+			}
+		}
+
+	}
+}

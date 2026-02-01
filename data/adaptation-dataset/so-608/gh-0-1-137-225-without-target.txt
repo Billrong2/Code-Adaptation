@@ -1,0 +1,113 @@
+
+
+
+package eu.geopaparazzi.library.sensors;
+
+import android.app.Activity;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
+import android.view.Display;
+import android.view.Surface;
+import android.view.WindowManager;
+
+import eu.geopaparazzi.library.database.GPLog;
+
+
+public class OrientationSensor implements SensorEventListener {
+
+    public final static int SENSOR_UNAVAILABLE = -1;
+
+    
+    private SensorManager sensorManager;
+    private SensorEventListener m_parent;
+    private Activity parentActivity;            
+
+    
+    private float m_Norm_Gravity;           
+    private float[] m_NormGravityVector;    
+    private float m_Norm_MagField;          
+    private float[] m_NormMagFieldValues;   
+
+    
+    private int m_GravityAccuracy;          
+    private int m_MagneticFieldAccuracy;    
+
+    
+    private float[] m_NormEastVector;       
+    private float[] m_NormNorthVector;      
+    private boolean m_OrientationOK;        
+    private float m_azimuth_radians;        
+    private float m_pitch_radians;          
+    private float m_pitch_axis_radians;     
+
+
+    
+    public OrientationSensor(SensorManager sensorManager, SensorEventListener parent) {
+        this.sensorManager = sensorManager;
+        m_parent = parent;
+        parentActivity = null;
+        m_NormGravityVector = m_NormMagFieldValues = null;
+        m_NormEastVector = new float[3];
+        m_NormNorthVector = new float[3];
+        m_OrientationOK = false;
+    }
+
+    public float getAzimuthDegrees() {
+        float azimuth = (float) Math.toDegrees(m_azimuth_radians);
+        if (azimuth < 0) {
+            azimuth = 360 + azimuth;
+        }
+        return azimuth;
+    }
+
+    public int register(Activity activity, int sensorSpeed) {
+        parentActivity = activity;  
+        m_NormGravityVector = new float[3];
+        m_NormMagFieldValues = new float[3];
+        m_OrientationOK = false;
+        int count = 0;
+        Sensor sensorGravity = sensorManager.getDefaultSensor(Sensor.TYPE_GRAVITY);
+        if (sensorGravity != null) {
+            sensorManager.registerListener(this, sensorGravity, sensorSpeed);
+            m_GravityAccuracy = SensorManager.SENSOR_STATUS_ACCURACY_HIGH;
+            count++;
+        } else {
+            m_GravityAccuracy = SENSOR_UNAVAILABLE;
+        }
+        Sensor sensorMagField = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
+        if (sensorMagField != null) {
+            sensorManager.registerListener(this, sensorMagField, sensorSpeed);
+            m_MagneticFieldAccuracy = SensorManager.SENSOR_STATUS_ACCURACY_HIGH;
+            count++;
+        } else {
+            m_MagneticFieldAccuracy = SENSOR_UNAVAILABLE;
+        }
+        return count;
+    }
+
+    public void unregister() {
+        parentActivity = null;
+        m_NormGravityVector = m_NormMagFieldValues = null;
+        m_OrientationOK = false;
+        sensorManager.unregisterListener(this);
+    }
+
+    // TODO
+
+
+    @Override
+    public void onAccuracyChanged(Sensor sensor, int accuracy) {
+        int SensorType = sensor.getType();
+        switch (SensorType) {
+            case Sensor.TYPE_GRAVITY:
+                m_GravityAccuracy = accuracy;
+                break;
+            case Sensor.TYPE_MAGNETIC_FIELD:
+                m_MagneticFieldAccuracy = accuracy;
+                break;
+        }
+        if (m_parent != null) m_parent.onAccuracyChanged(sensor, accuracy);
+    }
+}

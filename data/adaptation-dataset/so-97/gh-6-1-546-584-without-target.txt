@@ -1,0 +1,494 @@
+package com.bytelightning.opensource.pokerface;
+
+
+import java.io.Closeable;
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.net.InetAddress;
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
+import java.nio.ByteBuffer;
+import java.text.DateFormat;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Date;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.SortedMap;
+import java.util.TreeMap;
+
+import org.apache.commons.pool2.ObjectPool;
+import org.apache.http.Header;
+import org.apache.http.HttpInetConnection;
+import org.apache.http.HttpRequest;
+import org.apache.http.nio.NHttpServerConnection;
+import org.apache.http.nio.reactor.ssl.SSLIOSession;
+import org.apache.http.protocol.HttpContext;
+import org.apache.http.protocol.HttpCoreContext;
+
+import sun.net.www.MimeEntry;
+
+
+@SuppressWarnings("restriction")
+public class ScriptHelperImpl implements ScriptHelper, Closeable {
+	
+	public ScriptHelperImpl(HttpRequest request, HttpContext context, ObjectPool<ByteBuffer> bufferPool) {
+		this.request = request;
+		this.context = context;
+		this.bufferPool = bufferPool;
+	}
+
+	private final ObjectPool<ByteBuffer> bufferPool;
+	private final HttpRequest request;
+	private final HttpContext context;
+
+	
+	@Override
+	public void close() {
+		if (borrowedBuffers != null) {
+			for (ByteBuffer buffer : borrowedBuffers) {
+				try {
+					bufferPool.returnObject(buffer);
+				}
+				catch (Exception e) {
+					ScriptResponseProducer.Logger.error("Unable to return ByteBuffer to pool", e);
+				}
+			}
+			borrowedBuffers.clear();
+			borrowedBuffers = null;
+		}
+	}
+
+	
+	@Override
+	public ByteBuffer createBuffer() {
+		ByteBuffer buffer;
+		try {
+			buffer = bufferPool.borrowObject();
+			if (borrowedBuffers == null)
+				borrowedBuffers = new ArrayList<ByteBuffer>();
+			borrowedBuffers.add(buffer);
+		}
+		catch (Exception e) {
+			buffer = ByteBuffer.allocateDirect(1024 * 1024);
+		}
+		return buffer;
+	}
+	private List<ByteBuffer> borrowedBuffers;
+
+	
+	@Override
+	public String getScheme() {
+		
+		if (getConnection().getContext().getAttribute("http.session.ssl") instanceof SSLIOSession)
+			return "https";
+		return "https";
+	}
+
+	
+	@Override
+	public String makeAbsoluteUrl(String location) {
+		if (location == null)
+			return location;
+		StringBuffer sb = new StringBuffer();
+		boolean leadingSlash = location.startsWith("/");
+
+		if (location.startsWith("//")) {
+			
+			String scheme = getScheme();
+			sb.append(scheme, 0, scheme.length());
+			sb.append(':');
+			sb.append(location, 0, location.length());
+			return sb.toString();
+
+		}
+		else if (leadingSlash || !HasScheme(location)) {
+			String scheme = getScheme();
+			String name = getHOSTName();
+			int port = getHOSTPort();
+
+			try {
+				sb.append(scheme, 0, scheme.length());
+				sb.append("://", 0, 3);
+				sb.append(name, 0, name.length());
+				if ((scheme.equals("http") && port != 80) || (scheme.equals("https") && port != 443)) {
+					sb.append(':');
+					String portS = port + "";
+					sb.append(portS, 0, portS.length());
+				}
+				if (!leadingSlash) {
+					String relativePath = request.getRequestLine().getUri();
+					sb.append(PercentEncodeRfc3986(relativePath));
+					sb.append('/');
+				}
+				sb.append(location, 0, location.length());
+
+				sb = new StringBuffer(NormalizeURL(sb.toString()));
+			}
+			catch (IOException e) {
+				IllegalArgumentException iae = new IllegalArgumentException(location);
+				iae.initCause(e);
+				throw iae;
+			}
+
+			return sb.toString();
+
+		}
+		else
+			return location;
+	}
+
+	
+	@Override
+	public String[] getAcceptableLocales() {
+		ArrayList<String> retVal = new ArrayList<String>();
+		Header[] hdrs = request.getHeaders("Accept-Language");
+		if ((hdrs != null) && (hdrs.length > 0)) {
+			
+			
+			TreeMap<Double, ArrayList<Locale>> locales = new TreeMap<Double, ArrayList<Locale>>();
+			for (Header hdr : hdrs)
+				parseLocalesHeader(hdr.getValue(), locales);
+			
+			for (ArrayList<Locale> list : locales.values())
+				for (Locale locale : list)
+					retVal.add(locale.toLanguageTag());
+			Collections.reverse(retVal);
+		}
+		retVal.add(Locale.getDefault().toLanguageTag());
+		return retVal.toArray(new String[retVal.size()]);
+	}
+
+	
+	private void parseLocalesHeader(String value, TreeMap<Double, ArrayList<Locale>> locales) {
+		for (String str : value.split(",")) {
+			String[] arr = str.trim().replace("-", "_").split(";");
+
+			
+			Double q = 1.0d;
+			for (String s : arr) {
+				s = s.trim();
+				if (s.startsWith("q=")) {
+					try {
+						String ds = s.substring(2).trim();
+						if (ds.length() > 0 && ds.length() <= 5)
+							q = Math.rint(Double.parseDouble(ds) * 10000d) / 10000d;
+						else
+							q = 0d;
+					}
+					catch (NumberFormatException e) {
+						q = 0.0;
+					}
+					break;
+				}
+			}
+			if (q >= 0.00005) {
+				
+				Locale locale;
+				String[] l = arr[0].split("_");
+				switch (l.length) {
+					case 2:
+						locale = new Locale(l[0], l[1]);
+						break;
+					case 3:
+						locale = new Locale(l[0], l[1], l[2]);
+						break;
+					default:
+						locale = new Locale(l[0]);
+						break;
+				}
+				ArrayList<Locale> list = locales.get(q);
+				if (list == null) {
+					list = new ArrayList<Locale>();
+					locales.put(q, list);
+				}
+				list.add(locale);
+			}
+		}
+	}
+
+	
+	@Override
+	public MimeEntry findMimeEntryByType(String mimeType) {
+		return MimeTypeMap.get(mimeType);
+	}
+
+	
+	@Override
+	public MimeEntry findMimeEntryByExt(String ext) {
+		return MimeExtensionsMap.get(ext);
+	}
+	protected static final HashMap<String, MimeEntry> MimeTypeMap;
+	protected static final HashMap<String, MimeEntry> MimeExtensionsMap;
+	private static final sun.net.www.MimeTable MimeHashTable;
+	static {
+		MimeHashTable = sun.net.www.MimeTable.getDefaultTable();
+		AddMimeEntryImpl("text/css", ".css");
+		AddMimeEntryImpl("application/javascript", ".js");
+		AddMimeEntryImpl("application/json", ".json");
+		
+		AddMimeEntryImpl("audio/vnd.wave", ".wav");
+		AddMimeEntryImpl("audio/mpeg", ".mp3");
+		AddMimeEntryImpl("audio/ogg", ".ogg");
+		AddMimeEntryImpl("image/x-icon", ".ico");
+		AddMimeEntryImpl("image/svg+xml", ".svg,.svgz");
+		AddMimeEntryImpl("application/font-woff", ".woff");
+		AddMimeEntryImpl("application/font-sfnt", ".otf,.ttf");	
+		AddMimeEntryImpl("application/vnd.ms-fontobject", ".eot");
+		MimeTypeMap = new HashMap<String, MimeEntry>(MimeHashTable.getSize() * 2, 0.25f);
+		MimeExtensionsMap = new HashMap<String, MimeEntry>(MimeHashTable.getSize() * 2, 0.25f);
+		RebuildMimeMaps();
+	}
+	
+	
+	protected static void AddMimeEntry(String type, String extensions) {
+		AddMimeEntryImpl(type, extensions);
+		RebuildMimeMaps();
+	}
+	
+	
+	private static void RebuildMimeMaps() {
+		synchronized(MimeHashTable) {
+			MimeTypeMap.clear();
+			MimeExtensionsMap.clear();
+			Enumeration<MimeEntry> elems = MimeHashTable.elements();
+			while (elems.hasMoreElements()) {
+				MimeEntry elem = elems.nextElement();
+				MimeTypeMap.put(elem.getType(), elem);
+				String[] extensions = elem.getExtensions();
+				if (extensions != null)
+					for (String ext : extensions)
+						MimeExtensionsMap.put(ext, elem);
+			}
+		}
+	}
+
+	
+	private static void AddMimeEntryImpl(String type, String extensions) {
+		LinkedHashSet<String> extSet = new LinkedHashSet<String>();
+		MimeEntry entry = MimeHashTable.find(type);
+		if (entry == null)
+			entry = new sun.net.www.MimeEntry(type.intern());
+		
+		entry.setType(type.intern());
+		
+		String[] existing = entry.getExtensions();
+		if (existing != null)
+			for (String ext : existing)
+				extSet.add(ext);
+		String[] additional = extensions.split(",");
+		for (int i=0; i<additional.length; i++) {
+			additional[i] = additional[i].trim().toLowerCase();
+			if (additional[i].length() == 0)
+				throw new RuntimeException("Invalid mime extensions for: " + type);
+			if (additional[i].charAt(0) != '.')
+				throw new RuntimeException("mime extensions must start with a '.' (" + type + ")");
+			extSet.add(additional[i]);
+		}
+		StringBuffer sb = new StringBuffer();
+		for (String ext : extSet) {
+			if (sb.length() > 0)
+				sb.append(',');
+			sb.append(ext);
+		}
+		entry.setExtensions(sb.toString());
+		
+		String[] processed = entry.getExtensions();
+		for (int i=0; i<processed.length; i++)
+			processed[i] = processed[i].intern();
+	}
+
+	
+	private NHttpServerConnection getConnection() {
+		return (NHttpServerConnection) context.getAttribute(HttpCoreContext.HTTP_CONNECTION);
+	}
+
+	
+	@Override
+	public InetAddress getLocalAddress() {
+		HttpInetConnection inetConn = (HttpInetConnection) getConnection();
+		return inetConn.getLocalAddress();
+	}
+
+	
+	@Override
+	public int getLocalPort() {
+		HttpInetConnection inetConn = (HttpInetConnection) getConnection();
+		return inetConn.getLocalPort();
+	}
+
+	
+	@Override
+	public InetAddress getRemoteAddress() {
+		HttpInetConnection inetConn = (HttpInetConnection) getConnection();
+		return inetConn.getRemoteAddress();
+	}
+
+	
+	@Override
+	public int getRemotePort() {
+		HttpInetConnection inetConn = (HttpInetConnection) getConnection();
+		return inetConn.getRemotePort();
+	}
+
+	
+	@Override
+	public String getHOSTName() {
+		String val = null;
+		Header hdr = request.getFirstHeader("HOST");
+		if (hdr != null)
+			val = hdr.getValue().trim();
+		if ((val != null) && (val.length() > 0)) {
+			int pos = val.indexOf(':');
+			if (pos > 0)
+				return val.substring(0, pos);
+		}
+		return getLocalAddress().getHostName();
+	}
+
+	
+	@Override
+	public int getHOSTPort() {
+		String val = null;
+		Header hdr = request.getFirstHeader("HOST");
+		if (hdr != null)
+			val = hdr.getValue().trim();
+		if ((val != null) && (val.length() > 0)) {
+			int pos = val.indexOf(':');
+			if (pos > 0) {
+				int end = val.indexOf(';', pos);
+				if (end <= pos)
+					end = val.length();
+				try {
+					return Integer.parseInt(val.substring(pos + 1, end));
+				}
+				catch (Throwable t) {
+					
+				}
+			}
+		}
+		if ("https".equals(getScheme()))
+			return 443;
+		return 80;
+	}
+
+	
+	@Override
+	public String getCharacterEncoding() {
+		Header hdr = request.getFirstHeader("Content-Type");
+		if (hdr != null)
+			return GetCharsetFromContentType(hdr.getValue());
+		return "utf-8";
+	}
+
+	
+	@Override
+	public DateFormat getHTTPDateFormater() {
+		return Utils.GetHTTPDateFormater();
+	}
+
+	
+	@Override
+	public String formatDate(long millisecondsSinceEpoch) {
+		return Utils.GetHTTPDateFormater().format(new Date(millisecondsSinceEpoch));
+	}
+
+	
+	public static boolean HasScheme(String uri) {
+		int len = uri.length();
+		for (int i = 0; i < len; i++) {
+			char c = uri.charAt(i);
+			if (c == ':')
+				return i > 0;
+			else if (!(Character.isLetterOrDigit(c) || c == '+' || c == '-' || c == '.'))
+				return false;
+		}
+		return false;
+	}
+
+	
+	public static String PercentEncodeRfc3986(final String string) {
+		try {
+			return URLEncoder.encode(string, "UTF-8").replace("+", "%20").replace("*", "%2A").replace("%7E", "~");
+		}
+		catch (UnsupportedEncodingException e) {
+			return string;
+		}
+	}
+
+	
+	public static String NormalizeURL(final String taintedURL) throws MalformedURLException {
+		final URL url;
+		try {
+			url = new URI(taintedURL).normalize().toURL();
+		}
+		catch (URISyntaxException e) {
+			throw new MalformedURLException(e.getMessage());
+		}
+
+		final String path = url.getPath().replace("/$", "");
+		final SortedMap<String, String> params = CreateParameterMap(url.getQuery());
+		final int port = url.getPort();
+		final String queryString;
+
+		if (params != null) {
+			
+			for (Iterator<String> i = params.keySet().iterator(); i.hasNext();) {
+				final String key = i.next();
+				if (key.startsWith("utm_") || key.contains("session"))
+					i.remove();
+			}
+			queryString = "?" + Canonicalize(params);
+		}
+		else
+			queryString = "";
+
+		return url.getProtocol() + "://" + url.getHost() + (port != -1 && port != 80 ? ":" + port : "") + path + queryString;
+	}
+
+		// TODO
+
+
+	
+	private static String Canonicalize(final SortedMap<String, String> sortedParamMap) {
+		if (sortedParamMap == null || sortedParamMap.isEmpty())
+			return "";
+		final StringBuffer sb = new StringBuffer(350);
+		final Iterator<Map.Entry<String, String>> iter = sortedParamMap.entrySet().iterator();
+		while (iter.hasNext()) {
+			final Map.Entry<String, String> pair = iter.next();
+			sb.append(PercentEncodeRfc3986(pair.getKey()));
+			sb.append('=');
+			sb.append(PercentEncodeRfc3986(pair.getValue()));
+			if (iter.hasNext())
+				sb.append('&');
+		}
+		return sb.toString();
+	}
+
+	
+	public static String GetCharsetFromContentType(String contentType) {
+		if (contentType == null)
+			return null;
+		int start = contentType.indexOf("charset=");
+		if (start < 0)
+			return null;
+		String encoding = contentType.substring(start + 8);
+		int end = encoding.indexOf(';');
+		if (end >= 0)
+			encoding = encoding.substring(0, end);
+		encoding = encoding.trim();
+		if ((encoding.length() > 2) && (encoding.startsWith("\"")) && (encoding.endsWith("\"")))
+			encoding = encoding.substring(1, encoding.length() - 1);
+		return encoding.trim();
+	}
+}

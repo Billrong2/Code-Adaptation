@@ -1,0 +1,298 @@
+package brooklyn.util.net;
+
+import java.io.IOException;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.SocketException;
+import java.net.UnknownHostException;
+import java.util.Arrays;
+import java.util.Enumeration;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Pattern;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import brooklyn.util.text.Identifiers;
+
+import com.google.common.base.Preconditions;
+import com.google.common.base.Throwables;
+import com.google.common.net.HostAndPort;
+import com.google.common.primitives.UnsignedBytes;
+
+public class Networking {
+
+    private static final Logger log = LoggerFactory.getLogger(Networking.class);
+    
+    public static final int MIN_PORT_NUMBER = 1;
+    public static final int MAX_PORT_NUMBER = 65535;
+
+    
+    
+    public static final String VALID_IP_ADDRESS_REGEX = "^((0*[0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}(0*[0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$";
+    
+    public static final Pattern VALID_IP_ADDRESS_PATTERN;
+    static {
+        VALID_IP_ADDRESS_PATTERN = Pattern.compile(VALID_IP_ADDRESS_REGEX);
+    }
+
+    public static final List<Cidr> PRIVATE_NETWORKS = Cidr.PRIVATE_NETWORKS_RFC_1918;
+    
+    public static InetAddress ANY_NIC = getInetAddressWithFixedName(0, 0, 0, 0);
+    public static InetAddress LOOPBACK = getInetAddressWithFixedName(127, 0, 0, 1);
+        
+    private static boolean loggedLocalhostNotAvailable = false;
+    public static boolean isPortAvailable(int port) {
+        try {
+            return isPortAvailable(InetAddress.getByName("localhost"), port);
+        } catch (UnknownHostException e) {
+            if (!loggedLocalhostNotAvailable) {
+                loggedLocalhostNotAvailable = true;
+                log.warn("localhost unavailable during port availability check for "+port+": "+e+"; ignoring, but this may be a sign of network misconfiguration");
+            }
+            return isPortAvailable(null, port);
+        }
+    }
+    // TODO
+
+    
+    public static int nextAvailablePort(int port) {
+        while (!isPortAvailable(port)) port++;
+        return port;
+    }
+
+    public static boolean isPortValid(Integer port) {
+        return (port!=null && port>=Networking.MIN_PORT_NUMBER && port<=Networking.MAX_PORT_NUMBER);
+    }
+    public static int checkPortValid(Integer port, String errorMessage) {
+        if (!isPortValid(port)) {
+            throw new IllegalArgumentException("Invalid port value "+port+": "+errorMessage);
+        }
+        return port;
+    }
+
+    public static void checkPortsValid(@SuppressWarnings("rawtypes") Map ports) {
+        for (Object ppo : ports.entrySet()) {
+            Map.Entry<?,?> pp = (Map.Entry<?,?>)ppo;
+            Object val = pp.getValue();
+            if(val == null){
+                throw new IllegalArgumentException("port for "+pp.getKey()+" is null");
+            }else if (!(val instanceof Integer)) {
+                throw new IllegalArgumentException("port "+val+" for "+pp.getKey()+" is not an integer ("+val.getClass()+")");
+            }
+            checkPortValid((Integer)val, ""+pp.getKey());
+        }
+    }
+
+    
+    public static boolean isPrivateSubnet(InetAddress address) {
+        return address.isSiteLocalAddress() || address.isLoopbackAddress() || address.isLinkLocalAddress();
+    }
+
+    
+    public static boolean isLocalOnly(InetAddress address) {
+        return address.isLoopbackAddress() || address.isLinkLocalAddress();
+    }
+    
+    
+    public static boolean isLocalOnly(String hostnameOrIp) {
+        Preconditions.checkNotNull(hostnameOrIp, "hostnameOrIp");
+        if ("127.0.0.1".equals(hostnameOrIp)) return true;
+        if ("localhost".equals(hostnameOrIp)) return true;
+        if ("localhost.localdomain".equals(hostnameOrIp)) return true;
+        try {
+            InetAddress ia = getInetAddressWithFixedName(hostnameOrIp);
+            return isLocalOnly(ia);
+        } catch (Exception e) {
+            log.debug("Networking cannot resolve "+hostnameOrIp+": assuming it is not a local-only address, but it is a private address");
+            return false;
+        }
+    }
+
+    
+    public static boolean isPrivateSubnet(String hostnameOrIp) {
+        Preconditions.checkNotNull(hostnameOrIp, "hostnameOrIp");
+        try {
+            InetAddress ia = getInetAddressWithFixedName(hostnameOrIp);
+            return isPrivateSubnet(ia);
+        } catch (Exception e) {
+            log.debug("Networking cannot resolve "+hostnameOrIp+": assuming it IS a private address");
+            return true;
+        }
+    }
+
+    private static boolean triedUnresolvableHostname = false;
+    private static String cachedAddressOfUnresolvableHostname = null;
+    
+    
+    public synchronized static String getAddressOfUnresolvableHostname() {
+        if (triedUnresolvableHostname) return cachedAddressOfUnresolvableHostname;
+        String h = "noexistent-machine-"+Identifiers.makeRandomBase64Id(8);
+        try {
+            cachedAddressOfUnresolvableHostname = InetAddress.getByName(h).getHostAddress();
+            log.info("Networking detected "+cachedAddressOfUnresolvableHostname+" being returned by DNS for bogus hostnames ("+h+")");
+        } catch (Exception e) {
+            log.debug("Networking detected failure on DNS resolution of unknown hostname ("+h+" throws "+e+")");
+            cachedAddressOfUnresolvableHostname = null;
+        }
+        triedUnresolvableHostname = true;
+        return cachedAddressOfUnresolvableHostname;
+    }
+    
+    
+    public static InetAddress resolve(String hostname) {
+        try {
+            InetAddress a = InetAddress.getByName(hostname);
+            if (a==null) return null;
+            String ha = a.getHostAddress();
+            if (log.isDebugEnabled()) log.debug("Networking resolved "+hostname+" as "+a);
+            if (ha.equals(getAddressOfUnresolvableHostname())) return null;
+            if (ha.startsWith("169.")) return null;
+            return a;
+        } catch (Exception e) {
+            if (log.isDebugEnabled()) log.debug("Networking failed to resolve "+hostname+", threw "+e);
+            return null;
+        }
+    }
+    
+    
+    public static InetAddress getInetAddressWithFixedName(byte[] ip) {
+        try {
+            StringBuilder name = new StringBuilder();
+            for (byte part : ip) {
+                if (name.length() > 0) name.append(".");
+                name.append(part);
+            }
+            return InetAddress.getByAddress(name.toString(), ip);
+        } catch (UnknownHostException e) {
+            throw Throwables.propagate(e);
+        }
+    }
+    
+    public static InetAddress getInetAddressWithFixedName(int ip1, int ip2, int ip3, int ip4) {
+        return getInetAddressWithFixedName(asByteArray(ip1, ip2, ip3, ip4));
+    }
+
+    public static InetAddress getInetAddressWithFixedName(int ip1, int ip2, int ip3, int ip4, int ip5, int ip6) {
+        return getInetAddressWithFixedName(asByteArray(ip1, ip2, ip3, ip4, ip5, ip6));
+    }
+    
+    
+    public static byte[] asByteArray(long ...bytes) {
+        byte[] result = new byte[bytes.length];
+        for (int i=0; i<bytes.length; i++)
+            result[i] = UnsignedBytes.checkedCast(bytes[i]);
+        return result;
+    }
+    
+    
+    public static boolean isValidIp4(String input) {
+        return VALID_IP_ADDRESS_PATTERN.matcher(input).matches();
+    }
+    
+    
+    public static InetAddress getInetAddressWithFixedName(String hostnameOrIp) {
+        try {
+            if (isValidIp4(hostnameOrIp)) {
+                byte[] ip = new byte[4];
+                String[] parts = hostnameOrIp.split("\\.");
+                assert parts.length == 4 : "val="+hostnameOrIp+"; split="+Arrays.toString(parts)+"; length="+parts.length;
+                for (int i = 0; i < parts.length; i++) {
+                    ip[i] = (byte)Integer.parseInt(parts[i]);
+                }
+                return InetAddress.getByAddress(hostnameOrIp, ip);
+            } else {
+                return InetAddress.getByName(hostnameOrIp);
+            }
+        } catch (UnknownHostException e) {
+            throw Throwables.propagate(e);
+        }
+    }
+
+    
+    public static InetAddress getLocalHost() {
+        try {
+            return InetAddress.getLocalHost();
+        } catch (UnknownHostException e) {
+            InetAddress result = null;
+            result = getInetAddressWithFixedName("127.0.0.1");
+            log.warn("Localhost is not resolvable; using "+result);
+            return result;
+        }
+    }
+    
+    
+    public static Map<String,InetAddress> getLocalAddresses() {
+        Map<String, InetAddress> result = new LinkedHashMap<String, InetAddress>();
+        Enumeration<NetworkInterface> ne;
+        try {
+            ne = NetworkInterface.getNetworkInterfaces();
+        } catch (SocketException e) {
+            log.warn("Local network interfaces are not resolvable: "+e);
+            ne = null;
+        }
+        while (ne != null && ne.hasMoreElements()) {
+            NetworkInterface nic = ne.nextElement();
+            Enumeration<InetAddress> inets = nic.getInetAddresses();
+            while (inets.hasMoreElements()) {
+                InetAddress inet = inets.nextElement();
+                result.put(inet.getHostAddress(), inet);
+            }
+        }
+        if (result.isEmpty()) {
+            log.warn("No local network addresses found; assuming 127.0.0.1");
+            InetAddress loop = Cidr.LOOPBACK.addressAtOffset(0);
+            result.put(loop.getHostAddress(), loop);
+        }
+        return result;
+    }
+
+    
+    public static Cidr cidr(String cidr) {
+        return new Cidr(cidr);
+    }
+
+    
+    public static Cidr getPrivateNetwork(String ip) {
+        Cidr me = new Cidr(ip+"/32");
+        for (Cidr c: PRIVATE_NETWORKS)
+            if (c.contains(me)) 
+                return c;
+        return me;
+    }
+
+    public static Cidr getPrivateNetwork(InetAddress address) {
+        return getPrivateNetwork(address.getHostAddress());
+    }
+    
+    
+    public static boolean isPublicIp(String ipAddress) {
+        Cidr me = new Cidr(ipAddress+"/32");
+        for (Cidr c: Cidr.NON_PUBLIC_CIDRS)
+            if (c.contains(me)) return false;
+        return true;
+    }
+
+    public static boolean isReachable(HostAndPort endpoint) {
+        try {
+            Socket s = new Socket(endpoint.getHostText(), endpoint.getPort());
+            try {
+                s.close();
+            } catch (Exception e) {
+                log.debug("Error closing socket, opened temporarily to check reachability to "+endpoint+" (continuing)", e);
+            }
+            return true;
+        } catch (Exception e) {
+            if (log.isTraceEnabled()) log.trace("Error reaching "+endpoint+" during reachability check (return false)", e);
+            return false;
+        }
+    }
+
+    
+
+}

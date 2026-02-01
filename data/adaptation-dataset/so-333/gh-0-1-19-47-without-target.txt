@@ -1,0 +1,36 @@
+package com.jbutewicz.flashlightbyjoe;
+
+import java.lang.reflect.Method;
+
+import android.os.IBinder;
+
+class DroidLED {
+	
+	
+	
+	
+	
+	
+
+	private Object svc = null;
+	private Method getFlashlightEnabled = null;
+	private Method setFlashlightEnabled = null;
+
+	// TODO
+
+
+	public boolean isEnabled() {
+		try {
+			return getFlashlightEnabled.invoke(svc).equals(true);
+		} catch (Exception e) {
+			return false;
+		}
+	}
+
+	public void enable(boolean tf) {
+		try {
+			setFlashlightEnabled.invoke(svc, tf);
+		} catch (Exception e) {
+		}
+	}
+}

@@ -1,0 +1,99 @@
+
+package org.openstreetmap.josm.io.remotecontrol;
+
+import static org.junit.Assert.assertEquals;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.security.GeneralSecurityException;
+import java.security.SecureRandom;
+import java.security.cert.X509Certificate;
+
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSession;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
+
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+import org.openstreetmap.josm.JOSMFixture;
+import org.openstreetmap.josm.Main;
+
+
+public class RemoteControlTest {
+
+    private String httpBase;
+    private String httpsBase;
+
+    
+    @Before
+    public void setUp() throws GeneralSecurityException {
+        JOSMFixture.createUnitTestFixture().init();
+        RemoteControl.PROP_REMOTECONTROL_HTTPS_ENABLED.put(true);
+        deleteKeystore();
+
+        RemoteControl.start();
+        disableCertificateValidation();
+        httpBase = "http://127.0.0.1:"+Main.pref.getInteger("remote.control.port", 8111);
+        httpsBase = "https://127.0.0.1:"+Main.pref.getInteger("remote.control.https.port", 8112);
+    }
+
+    
+    public static void deleteKeystore() {
+        try {
+            Files.deleteIfExists(Paths.get(
+                    RemoteControl.getRemoteControlDir()).resolve(RemoteControlHttpsServer.KEYSTORE_FILENAME));
+        } catch (IOException e) {
+            Main.error(e);
+        }
+    }
+
+        // TODO
+
+
+    
+    @After
+    public void tearDown() {
+        RemoteControl.stop();
+    }
+
+    
+    @Test
+    public void testHttpListOfCommands() throws Exception {
+        testListOfCommands(httpBase);
+    }
+
+    
+    @Test
+    public void testHttpsListOfCommands() throws Exception {
+        testListOfCommands(httpsBase);
+    }
+
+    private void testListOfCommands(String url) throws IOException, ReflectiveOperationException {
+        HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
+        connection.connect();
+        assertEquals(connection.getResponseCode(), HttpURLConnection.HTTP_BAD_REQUEST);
+        try (InputStream is = connection.getErrorStream()) {
+            
+            StringBuilder responseBody = new StringBuilder();
+            try (BufferedReader in = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+                String s;
+                while ((s = in.readLine()) != null) {
+                    responseBody.append(s);
+                    responseBody.append("\n");
+                }
+            }
+            assert responseBody.toString().contains(RequestProcessor.getUsageAsHtml());
+        }
+    }
+}

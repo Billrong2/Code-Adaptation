@@ -1,0 +1,90 @@
+package br.com.app.template.utils;
+
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
+import android.telephony.TelephonyManager;
+
+import org.androidannotations.annotations.EBean;
+import org.androidannotations.annotations.SystemService;
+
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.net.SocketAddress;
+import java.util.ArrayList;
+import java.util.List;
+
+
+
+@EBean
+public class ConnectionUtils {
+	
+	private List<ConnectionType> androidConnetionsTypes;
+	
+	@SystemService
+	ConnectivityManager cm;
+
+    
+	public void performConnectionVerification() {
+        androidConnetionsTypes = new ArrayList<>();
+
+		try {
+            NetworkInfo info = cm.getActiveNetworkInfo();
+            if (info == null || !info.isConnected()){
+                androidConnetionsTypes.add(ConnectionType.NO_CONNECTION);
+                return;
+            }
+
+            if (info.getType()  ==  ConnectivityManager.TYPE_MOBILE) {
+                androidConnetionsTypes.add(ConnectionType.MOBILE);
+            }
+            if(info.getType()  ==  ConnectivityManager.TYPE_WIFI){
+                androidConnetionsTypes.add(ConnectionType.WIFI);
+            }
+
+            if ( info.getType() !=  ConnectivityManager.TYPE_MOBILE &&
+                     info.getType()   != ConnectivityManager.TYPE_WIFI) {
+                androidConnetionsTypes.add(ConnectionType.NO_CONNECTION);
+            }
+
+        } catch (Exception e) {
+            androidConnetionsTypes.add(ConnectionType.NO_CONNECTION);
+        }
+	}
+
+    
+    public ConnectionType bestConnection() {
+        performConnectionVerification();
+        if (androidConnetionsTypes.contains(ConnectionType.WIFI)) {
+            return ConnectionType.WIFI;
+        } else if (androidConnetionsTypes.contains(ConnectionType.MOBILE)) {
+            return ConnectionType.MOBILE;
+        } else {
+            return ConnectionType.NO_CONNECTION;
+        }
+    }
+
+        // TODO
+
+
+    
+    public static boolean hostReachableByTcp(String host, int port, int timeout) {
+        try {
+            Socket socket = new Socket();
+            SocketAddress socketAddress = new InetSocketAddress(host, port);
+            socket.connect(socketAddress, timeout);
+            socket.close();
+            return true;
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    public List<ConnectionType> getAndroidConnetionsTypes() {
+        return androidConnetionsTypes;
+    }
+
+    public NetworkInfo getNetworkInfo(){
+        return cm.getActiveNetworkInfo();
+    }
+}

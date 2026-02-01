@@ -1,0 +1,50 @@
+package de.metas.printing.client;
+
+
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
+import java.util.Enumeration;
+import java.util.jar.Attributes;
+import java.util.jar.JarFile;
+import java.util.jar.Manifest;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+
+public class PrintingClientStandaloneService
+{
+	private final transient Logger logger = Logger.getLogger(getClass().getName());
+
+	public static void main(final String[] args)
+	{
+		new PrintingClientStandaloneService().run();
+	}
+
+		// TODO
+
+
+	private void run()
+	{
+		final Context context = Context.getContext();
+		context.addSource(new ConfigFileContext());
+
+		logVersionInfo();
+
+		
+		
+		final PrintingClient client = new PrintingClient();
+		client.start();
+		final Thread clientThread = client.getDaemonThread();
+		try
+		{
+			clientThread.join();
+		}
+		catch (final InterruptedException e)
+		{
+			logger.log(Level.INFO, "Interrupted. Exiting.", e);
+			client.stop();
+		}
+	}
+}

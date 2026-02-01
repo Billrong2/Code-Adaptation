@@ -1,0 +1,60 @@
+package org.osmdroid.samplefragments.tilesources;
+
+import android.graphics.ColorFilter;
+import android.graphics.ColorMatrix;
+import android.graphics.ColorMatrixColorFilter;
+
+import org.osmdroid.samplefragments.BaseSampleFragment;
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory;
+import org.osmdroid.views.overlay.TilesOverlay;
+
+
+public class SampleWhackyColorFilter extends BaseSampleFragment {
+
+    @Override
+    public String getSampleTitle() {
+        return "Whacky Color Tiles";
+    }
+
+    @Override
+    public void addOverlays() {
+
+        
+        
+        
+
+        
+        
+
+        ColorMatrix cm = new ColorMatrix();
+        float brightness =.5f;  
+        cm.set(new float[] {
+                brightness, 0, 0, 0, 0,    
+                0, brightness, 0, 0, 0,    
+                0, 0, brightness, 0, 0,    
+                0, 0, 0, 1, 0});    
+
+        this.mMapView.getOverlayManager().getTilesOverlay().setColorFilter(new ColorMatrixColorFilter(cm));
+
+        
+    }
+
+    
+    public static ColorFilter adjustHue( float value )
+    {
+        ColorMatrix cm = new ColorMatrix();
+
+        adjustHue(cm, value);
+
+        return new ColorMatrixColorFilter(cm);
+    }
+
+        // TODO
+
+
+    protected static float cleanValue(float p_val, float p_limit)
+    {
+        return Math.min(p_limit, Math.max(-p_limit, p_val));
+    }
+
+}

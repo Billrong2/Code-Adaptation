@@ -1,0 +1,221 @@
+package com.kartoflane.superluminal2.components;
+
+import org.eclipse.swt.events.PaintEvent;
+import org.eclipse.swt.graphics.GC;
+import org.eclipse.swt.graphics.Point;
+import org.eclipse.swt.graphics.Rectangle;
+
+
+public class Polygon {
+	
+	private int[] points;
+
+	
+	private int vertices;
+	
+	private Rectangle bounds;
+
+	
+	public Polygon(int[] pointsX, int[] pointsY) {
+		set(pointsX, pointsY);
+	}
+
+	
+	public Polygon(int[] points) {
+		set(points);
+	}
+
+	
+	public Polygon(Point[] points) {
+		set(points);
+	}
+
+	
+	public Polygon(int vertices) {
+		if (vertices <= 2)
+			throw new IllegalArgumentException("Number of vertices is too low (3 minimum)");
+
+		this.vertices = vertices;
+		this.points = new int[vertices * 2];
+	}
+
+	
+	public Polygon(Polygon poly) {
+		points = poly.toArray();
+		vertices = poly.vertices;
+		bounds = poly.getBounds();
+	}
+
+	
+	public Point getCenter() {
+		return new Point(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+	}
+
+	
+	public int getVertexCount() {
+		return vertices;
+	}
+
+	
+	public void set(int[] pointsX, int[] pointsY) {
+		if (pointsX.length != pointsY.length)
+			throw new IllegalArgumentException("Coordinate arrays are not equal.");
+		if (pointsX.length <= 2)
+			throw new IllegalArgumentException("The array is too small to create a polygon.");
+
+		this.vertices = pointsX.length;
+		this.points = new int[vertices * 2];
+
+		for (int i = 0; i < vertices; i++) {
+			points[i * 2] = pointsX[i];
+			points[i * 2 + 1] = pointsY[i];
+		}
+
+		calculateBounds();
+	}
+
+	
+	public void set(int[] points) {
+		if (points.length % 2 != 0)
+			throw new IllegalArgumentException("Array length must be even.");
+		if (points.length <= 2)
+			throw new IllegalArgumentException("The array is too small to create a polygon.");
+
+		this.vertices = points.length / 2;
+		this.points = points.clone();
+
+		for (int i = 0; i < vertices; i++) {
+			points[i * 2] = points[i * 2];
+			points[i * 2 + 1] = points[i * 2 + 1];
+		}
+
+		calculateBounds();
+	}
+
+	
+	public void set(Point[] points) {
+		if (points.length <= 2)
+			throw new IllegalArgumentException("The array is too small to create a polygon.");
+
+		this.vertices = points.length;
+		this.points = new int[vertices * 2];
+
+		for (int i = 0; i < vertices; i++) {
+			this.points[i * 2] = points[i].x;
+			this.points[i * 2 + 1] = points[i].y;
+		}
+
+		calculateBounds();
+	}
+
+	
+	public void translate(int dx, int dy) {
+		for (int i = 0; i < vertices; i++) {
+			points[i * 2] += dx;
+			points[i * 2 + 1] += dy;
+		}
+		bounds.x += dx;
+		bounds.y += dy;
+	}
+
+	
+	public void setLocation(int x, int y) {
+		Point center = getCenter();
+		translate(x - center.x, y - center.y);
+	}
+
+	
+	public int[] toArray() {
+		return points.clone();
+	}
+
+	
+	public void rotate(float radians, int centerX, int centerY) {
+		double sin = Math.sin(radians);
+		double cos = Math.cos(radians);
+
+		for (int i = 0; i < vertices; i++) {
+			
+			points[i * 2] -= centerX;
+			points[i * 2 + 1] -= centerY;
+
+			
+			int newx = (int) (points[i * 2] * cos - points[i * 2 + 1] * sin);
+			int newy = (int) (points[i * 2] * sin + points[i * 2 + 1] * cos);
+
+			
+			points[i * 2] = newx + centerX;
+			points[i * 2 + 1] = newy + centerY;
+		}
+
+		calculateBounds();
+	}
+
+	
+	public void rotate(float radians, Point p) {
+		rotate(radians, p.x, p.y);
+	}
+
+	
+	public void rotate(float radians) {
+		Point c = getCenter();
+		rotate(radians, c.x, c.y);
+	}
+
+	
+	public Rectangle getBounds() {
+		return new Rectangle(bounds.x, bounds.y, bounds.width, bounds.height);
+	}
+
+	
+	public void draw(PaintEvent e) {
+		e.gc.drawPolygon(points);
+	}
+
+	
+	public void fill(PaintEvent e) {
+		e.gc.fillPolygon(points);
+	}
+
+		// TODO
+
+
+	
+	public boolean contains(Point p) {
+		return contains(p.x, p.y);
+	}
+
+	
+	private void calculateBounds() {
+		int boundsMinX = Integer.MAX_VALUE;
+		int boundsMinY = Integer.MAX_VALUE;
+		int boundsMaxX = Integer.MIN_VALUE;
+		int boundsMaxY = Integer.MIN_VALUE;
+
+		for (int i = 0; i < vertices; i++) {
+			int x = points[i * 2];
+			boundsMinX = Math.min(boundsMinX, x);
+			boundsMaxX = Math.max(boundsMaxX, x);
+			int y = points[i * 2 + 1];
+			boundsMinY = Math.min(boundsMinY, y);
+			boundsMaxY = Math.max(boundsMaxY, y);
+		}
+		bounds = new Rectangle(boundsMinX, boundsMinY, boundsMaxX - boundsMinX, boundsMaxY - boundsMinY);
+	}
+
+	public String toString() {
+		StringBuilder buf = new StringBuilder();
+		buf.append("Polygon: { ");
+		for (int i = 0; i < vertices; i++) {
+			buf.append(points[i * 2] + ", " + points[i * 2 + 1]);
+			if (i != vertices - 1)
+				buf.append(" ; ");
+		}
+		buf.append(" }");
+		return buf.toString();
+	}
+
+	public int hashCode() {
+		return bounds.hashCode() ^ points.hashCode();
+	}
+}

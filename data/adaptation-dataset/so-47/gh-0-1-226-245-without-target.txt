@@ -1,0 +1,211 @@
+package org.foo;
+
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.io.InputStream;
+import java.math.BigInteger;
+
+import javax.imageio.ImageIO;
+import javax.servlet.http.HttpServletRequest;
+
+import org.apache.chemistry.opencmis.commons.data.ContentStream;
+import org.apache.chemistry.opencmis.commons.data.ExtensionsData;
+import org.apache.chemistry.opencmis.commons.exceptions.CmisRuntimeException;
+import org.apache.chemistry.opencmis.commons.impl.dataobjects.ContentStreamImpl;
+import org.apache.chemistry.opencmis.commons.server.CallContext;
+import org.apache.chemistry.opencmis.commons.server.CmisService;
+import org.apache.chemistry.opencmis.server.shared.ThresholdOutputStream;
+import org.apache.chemistry.opencmis.server.shared.ThresholdOutputStreamFactory;
+import org.apache.chemistry.opencmis.server.support.wrapper.AbstractCmisServiceWrapper;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.edit.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.graphics.xobject.PDPixelMap;
+import org.apache.pdfbox.pdmodel.graphics.xobject.PDXObjectImage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+
+public class CmisCustomPdfWatermarkServiceWrapper extends AbstractCmisServiceWrapper {
+
+    
+    private static final Logger LOG = LoggerFactory.getLogger(CmisCustomPdfWatermarkServiceWrapper.class);
+
+    
+    public static final String USER_FILTER_NAME = "userfilter";
+
+    private String userToWatermark = null;
+
+    
+    public CmisCustomPdfWatermarkServiceWrapper(CmisService service) {
+        super(service);
+    }
+
+    
+    @Override
+    public void initialize(Object[] params) {
+
+        
+        
+        
+        
+        
+        
+        
+        
+        
+
+        LOG.info("Initializing the CmisCustomPdfWatermarkServiceWrapper.");
+
+        for (Object parm : params) {
+            if (parm == null) {
+                continue;
+            }
+
+            LOG.info("[CmisCustomPdfWatermarkServiceWrapper]Parameter:" + parm.toString());
+
+            
+            
+            String[] parts = parm.toString().split("=");
+
+            if (USER_FILTER_NAME.equalsIgnoreCase(parts[0])) {
+                
+                userToWatermark = parts[1];
+            }
+        }
+    }
+
+    
+    protected void slflog(String operation, String repositoryId) {
+        if (repositoryId == null) {
+            repositoryId = "<none>";
+        }
+
+        HttpServletRequest request = (HttpServletRequest) getCallContext().get(CallContext.HTTP_SERVLET_REQUEST);
+        String userAgent = request.getHeader("User-Agent");
+        if (userAgent == null) {
+            userAgent = "<unknown>";
+        }
+
+        String binding = getCallContext().getBinding();
+
+        LOG.info("Operation: {}, Repository ID: {}, Binding: {}, User Agent: {}", operation, repositoryId, binding,
+                userAgent);
+    }
+
+    @Override
+    public ContentStream getContentStream(String repositoryId, String objectId, String streamId, BigInteger offset,
+            BigInteger length, ExtensionsData extension) {
+
+        slflog("getContentStream override from Chameleon module --------------", repositoryId);
+        long startTime = System.currentTimeMillis();
+
+        CallContext sharedContext = this.getCallContext();
+
+        
+        
+        
+        
+        
+
+        ContentStream retVal = getWrappedService().getContentStream(repositoryId, objectId, streamId, offset, length,
+                extension);
+
+        if (sharedContext.getUsername().equalsIgnoreCase(userToWatermark)) {
+            if ((retVal != null) && (retVal.getMimeType().contains("pdf"))) {
+                InputStream rawStream = retVal.getStream();
+
+                
+                
+                
+                
+                PDDocument modifiedPDF = watermarkPDF(rawStream);
+
+                
+                
+                
+                
+                ThresholdOutputStream out;
+                ThresholdOutputStreamFactory outFactory = (ThresholdOutputStreamFactory) sharedContext
+                        .get(CallContext.STREAM_FACTORY);
+                if (outFactory != null) {
+                    
+                    out = outFactory.newOutputStream();
+                } else {
+                    
+                    
+                    
+                    
+                    out = new ThresholdOutputStream(null, 4 * 1024 * 1024, -1);
+                }
+
+                try {
+                    modifiedPDF.save(out);
+                    modifiedPDF.close();
+                    InputStream modifiedInputStream = out.getInputStream(); 
+                                                                            
+
+                    
+                    
+
+                    
+                    retVal = new ContentStreamImpl(retVal.getFileName(), null, "application/pdf", modifiedInputStream);
+
+                } catch (Exception e) {
+                    slflog("error transposing stream getContentStream ", e.getMessage());
+
+                    LOG.error("Could not watermark PDF document: {}", e.getMessage(), e);
+                    throw new CmisRuntimeException("Could not watermark PDF document!");
+                }
+            } 
+        } 
+
+        LOG.info("[CmisCustomServiceWrapper] Exiting method getContentStream. time (ms):"
+                + (System.currentTimeMillis() - startTime));
+        
+        
+
+        return retVal;
+    }
+
+    public PDDocument watermarkPDF(InputStream rawStream) {
+        PDDocument pdf = null;
+        try {
+
+            pdf = PDDocument.load(rawStream);
+
+            
+            
+            
+            
+            
+            
+            InputStream watermarkStream = CmisCustomPdfWatermarkServiceWrapper.class.getClassLoader()
+                    .getResourceAsStream("cmis.png");
+            BufferedImage buffered = ImageIO.read(watermarkStream);
+
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+
+            addImageToPage(pdf, 0, 0, 0, 1.0f, buffered);
+
+            
+            pdf.getDocumentInformation().setTitle("Modified by fileBridge");
+        } catch (Exception e) {
+            slflog("error watermarking pdf in getContentStream ", e.getMessage());
+        }
+
+        return pdf;
+    }
+
+        // TODO
+
+}

@@ -1,0 +1,28 @@
+
+
+package mega.privacy.android.app.components;
+
+import mega.privacy.android.app.R;
+import mega.privacy.android.app.utils.Util;
+
+import android.content.Context;
+import android.graphics.Canvas;
+import android.graphics.drawable.Drawable;
+import android.support.v7.widget.RecyclerView;
+import android.util.DisplayMetrics;
+import android.view.View;
+
+public class SimpleDividerItemDecoration extends RecyclerView.ItemDecoration {
+    private Drawable mDivider;
+    DisplayMetrics outMetrics;
+    Context context;
+ 
+    public SimpleDividerItemDecoration(Context context, DisplayMetrics outMetrics) {
+        mDivider = context.getResources().getDrawable(R.drawable.line_divider);
+        this.outMetrics = outMetrics;
+        this.context = context;
+    }
+
+    // TODO
+
+}

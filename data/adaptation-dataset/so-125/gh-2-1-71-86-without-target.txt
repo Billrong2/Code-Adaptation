@@ -1,0 +1,51 @@
+
+
+package com.tripadvisor.seekbar;
+
+import android.content.Context;
+import android.text.SpannableString;
+import android.text.style.ScaleXSpan;
+import android.util.AttributeSet;
+
+import static android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE;
+
+
+public class LetterSpacingTextView extends RobotoTextView {
+
+    private float letterSpacing = 0.0F;
+    private CharSequence originalText = "";
+
+
+    public LetterSpacingTextView(Context context, AttributeSet attrs) {
+        super(context, attrs);
+    }
+
+    public float getLetterSpacing() {
+        return letterSpacing;
+    }
+
+    public void setLetterSpacing(float mLetterSpacing) {
+        this.letterSpacing = mLetterSpacing;
+        requestLayout();
+        invalidate();
+    }
+
+    @Override
+    public void setText(CharSequence text, BufferType type) {
+        
+        
+        if (text == null) {
+            text = "";
+        }
+        originalText = text;
+        applyLetterSpacing();
+    }
+
+    @Override
+    public CharSequence getText() {
+        return originalText;
+    }
+
+    // TODO
+
+}

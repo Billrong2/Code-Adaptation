@@ -1,0 +1,89 @@
+package com.coinomi.wallet.ui.widget;
+
+import android.content.Context;
+import android.graphics.Paint;
+import android.util.AttributeSet;
+import android.util.TypedValue;
+import android.widget.TextView;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+
+public class FontFitTextView extends TextView {
+    private static final Logger log = LoggerFactory.getLogger(FontFitTextView.class);
+
+    
+    private float maxTextSize;
+    private Paint mTestPaint;
+
+    public FontFitTextView(Context context) {
+        super(context);
+        initialise();
+    }
+
+    public FontFitTextView(Context context, AttributeSet attrs) {
+        super(context, attrs);
+        initialise();
+    }
+
+    private void initialise() {
+        mTestPaint = new Paint();
+        mTestPaint.set(this.getPaint());
+        maxTextSize = getTextSize();
+        
+    }
+
+        // TODO
+
+
+    @Override
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec)
+    {
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+        int parentWidth = MeasureSpec.getSize(widthMeasureSpec);
+        int width = getMeasuredWidth();
+        int height = getMeasuredHeight();
+        refitText(this.getText().toString(), parentWidth);
+        this.setMeasuredDimension(parentWidth > width ? width : parentWidth, height);
+    }
+
+    @Override
+    protected void onTextChanged(final CharSequence text, final int start, final int before, final int after) {
+        super.setTextSize(TypedValue.COMPLEX_UNIT_PX, maxTextSize);
+    }
+
+    @Override
+    public void setTextSize(float size) {
+        log.error("Use setMaxTextSize instead");
+    }
+
+    @Override
+    public void setTextSize(int unit, float size) {
+        log.error("Use setMaxTextSize instead");
+    }
+
+    @Override
+    
+    public void setText(CharSequence text, BufferType type) {
+        final String DOUBLE_BYTE_WORDJOINER = "\u2060";
+        String fixString = "";
+        
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.HONEYCOMB_MR1
+                && android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.ICE_CREAM_SANDWICH_MR1) {
+            fixString = DOUBLE_BYTE_WORDJOINER;
+        }
+        super.setText(text + fixString, type);
+    }
+
+    
+    public void setMaxTextSize(float maxTextSize) {
+        this.maxTextSize = maxTextSize;
+        super.setTextSize(TypedValue.COMPLEX_UNIT_PX, maxTextSize);
+    }
+
+    
+    public float getMaxTextSize() {
+        return maxTextSize;
+    }
+}

@@ -1,0 +1,44 @@
+
+package org.apache.cxf.attachment;
+
+import java.io.ByteArrayOutputStream;
+import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+
+public final class Rfc5987Util {
+
+    private static final Pattern ENCODED_VALUE_PATTERN = Pattern.compile("%[0-9a-f]{2}|\\S",
+            Pattern.CASE_INSENSITIVE);
+
+    private Rfc5987Util() {
+
+    }
+
+    public static String encode(final String s) throws UnsupportedEncodingException {
+        return encode(s, StandardCharsets.UTF_8.name());
+    }
+
+        // TODO
+
+
+    public static String decode(String s, String encoding)
+        throws UnsupportedEncodingException {
+        Matcher matcher = ENCODED_VALUE_PATTERN.matcher(s);
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        while (matcher.find()) {
+            String matched = matcher.group();
+            if (matched.startsWith("%")) {
+                Integer value = Integer.parseInt(matched.substring(1), 16);
+                bos.write(value);
+            } else {
+                bos.write(matched.charAt(0));
+            }
+        }
+
+        return new String(bos.toByteArray(), encoding);
+    }
+}

@@ -1,0 +1,76 @@
+package nickrout.lenslauncher.util;
+
+import android.content.Context;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
+import android.content.res.Resources;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
+
+
+public class BitmapUtil {
+
+        // TODO
+
+
+    
+    public static Bitmap resIdToBitmap(Resources res, int resId) {
+        BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inScaled = false;
+        options.inDither = false;
+        options.inPreferredConfig = Bitmap.Config.ARGB_8888;
+        options.inPreferQualityOverSpeed = true;
+        try {
+            return BitmapFactory.decodeResource(res, resId, options);
+        } catch (OutOfMemoryError e1) {
+            e1.printStackTrace();
+            return null;
+        }
+    }
+
+    
+    public static int packageNameToResId(PackageManager packageManager, String packageName) {
+        try {
+            ApplicationInfo applicationInfo = packageManager.getApplicationInfo(packageName, PackageManager.GET_META_DATA);
+            return applicationInfo.icon;
+        } catch (PackageManager.NameNotFoundException e) {
+            e.printStackTrace();
+            return -1;
+        }
+    }
+
+    
+    public static Bitmap packageNameToBitmap(PackageManager packageManager, String packageName) {
+        try {
+            ApplicationInfo applicationInfo = packageManager.getApplicationInfo(packageName, PackageManager.GET_META_DATA);
+            Resources resources = packageManager.getResourcesForApplication(applicationInfo);
+            int appIconResId = applicationInfo.icon;
+            return resIdToBitmap(resources, appIconResId);
+        } catch (PackageManager.NameNotFoundException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    
+    public static Bitmap packageNameToBitmap(Context context, PackageManager packageManager, String packageName, int resId) {
+        try {
+            ApplicationInfo applicationInfo = packageManager.getApplicationInfo(packageName, PackageManager.GET_META_DATA);
+            Resources resources = packageManager.getResourcesForApplication(applicationInfo);
+            Bitmap bitmap = resIdToBitmap(resources, resId);
+            if (bitmap == null) {
+                Drawable drawable = packageManager.getApplicationIcon(packageName);
+                if (drawable != null) {
+                    bitmap = drawableToBitmap(drawable);
+                }
+            }
+            return bitmap;
+        } catch (PackageManager.NameNotFoundException | Resources.NotFoundException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+}

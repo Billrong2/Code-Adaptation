@@ -1,0 +1,53 @@
+
+
+package de.k3b.android.widget;
+
+import android.annotation.SuppressLint;
+import android.app.Activity;
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.content.res.Configuration;
+import android.content.res.Resources;
+import android.os.Bundle;
+import android.preference.PreferenceManager;
+
+import java.util.Locale;
+
+import de.k3b.android.androFotoFinder.Global;
+
+
+
+public abstract class LocalizedActivity extends Activity {
+    
+    private Locale myLocale = null;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        fixLocale(this);
+        super.onCreate(savedInstanceState);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        
+        if ((myLocale != null) && (myLocale.getLanguage() != Locale.getDefault().getLanguage())) {
+            myLocale = null;
+            recreate();
+        }
+    }
+
+        // TODO
+
+
+    
+    public static void recreate(Activity child) {
+        Activity context = child;
+        while (context != null) {
+            context.recreate();
+            context = context.getParent();
+        }
+
+    }
+}

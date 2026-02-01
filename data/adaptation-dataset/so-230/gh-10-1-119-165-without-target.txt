@@ -1,0 +1,80 @@
+
+package com.restfb.util;
+
+import static java.lang.String.format;
+import static java.net.URLDecoder.decode;
+import static java.net.URLEncoder.encode;
+import static java.util.Collections.emptyMap;
+
+import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+
+public final class UrlUtils {
+  
+  public static final String ENCODING_CHARSET = "UTF-8";
+
+  
+  private UrlUtils() {
+    
+  }
+
+  
+  public static String urlEncode(String string) {
+    if (string == null) {
+      return null;
+    }
+    try {
+      return encode(string, ENCODING_CHARSET);
+    } catch (UnsupportedEncodingException e) {
+      throw new IllegalStateException("Platform doesn't support " + ENCODING_CHARSET, e);
+    }
+  }
+
+  
+  public static String urlDecode(String string) {
+    if (string == null) {
+      return null;
+    }
+    try {
+      return decode(string, ENCODING_CHARSET);
+    } catch (UnsupportedEncodingException e) {
+      throw new IllegalStateException("Platform doesn't support " + ENCODING_CHARSET, e);
+    }
+  }
+
+  
+  public static Map<String, List<String>> extractParametersFromQueryString(String queryString) {
+    if (queryString == null) {
+      return emptyMap();
+    }
+
+    
+    return extractParametersFromUrl(
+      format("restfb://url%s", queryString.startsWith("?") ? queryString : "?" + queryString));
+  }
+
+    // TODO
+
+
+  public static String replaceOrAddQueryParameter(String url, String key, String value) {
+    String[] urlParts = url.split("\\?");
+    String qParameter = key + "=" + value;
+
+    if (urlParts.length == 2) {
+      Map<String, List<String>> paramMap = extractParametersFromQueryString(urlParts[1]);
+      if (paramMap.containsKey(key)) {
+        String queryValue = paramMap.get(key).get(0);
+        return url.replace(key + "=" + queryValue, qParameter);
+      } else {
+        return url + "&" + qParameter;
+      }
+
+    } else {
+      return url + "?" + qParameter;
+    }
+  }
+}

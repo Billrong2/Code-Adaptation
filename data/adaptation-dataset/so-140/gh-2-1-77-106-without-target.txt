@@ -1,0 +1,58 @@
+
+package com.freedomotic.plugins.devices.restapiv3.utils;
+
+import java.io.InputStream;
+import java.util.Scanner;
+import javax.servlet.http.HttpServletRequest;
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.Response;
+import javax.ws.rs.ext.ExceptionMapper;
+import javax.ws.rs.ext.Provider;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+
+@Provider
+public class ThrowableExceptionMapper implements ExceptionMapper<Throwable> {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ThrowableExceptionMapper.class.getName());
+    @Context
+    HttpServletRequest request;
+
+    @Override
+    public Response toResponse(Throwable t) {
+        if (t instanceof WebApplicationException) {
+            return ((WebApplicationException) t).getResponse();
+        } else {
+            String errorMessage = buildErrorMessage(request);
+            LOG.error(errorMessage, t);
+            return Response.serverError().entity("").build();
+        }
+    }
+
+    private String buildErrorMessage(HttpServletRequest req) {
+        StringBuilder message = new StringBuilder();
+        String entity = "(empty)";
+
+        try {
+            
+            InputStream is = req.getInputStream();
+            
+            Scanner s = new Scanner(is, "UTF-8").useDelimiter("\\A");
+            entity = s.hasNext() ? s.next() : entity;
+        } catch (Exception ex) {
+            
+        }
+
+        message.append("Uncaught REST API exception:\n");
+        message.append("URL: ").append(getOriginalURL(req)).append("\n");
+        message.append("Method: ").append(req.getMethod()).append("\n");
+        message.append("Entity: ").append(entity).append("\n");
+
+        return message.toString();
+    }
+
+    // TODO
+
+}

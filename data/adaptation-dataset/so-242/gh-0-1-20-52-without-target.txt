@@ -1,0 +1,38 @@
+package de.fencing_game.paul.examples;
+
+import java.util.Arrays;
+
+
+public class InpreciseMode {
+
+    
+    private double[] data;
+
+    public InpreciseMode(double ... data) {
+        this.data = data;
+    }
+    
+
+        // TODO
+
+
+    public void printSmallNeighbourhoods() {
+        for(int frequency = 2; frequency <= data.length; frequency++) {
+            double[][] found = findSmallNeighbourhood(frequency);
+            
+            System.out.printf("There are %d elements in %f radius "+
+                              "around %f:%n     %s.%n",
+                              frequency, found[0][1]/2, found[0][0],
+                              Arrays.toString(found[1]));
+        }
+    }
+
+    
+    public static void main(String[] params) {
+        InpreciseMode m =
+            new InpreciseMode(1.12, 1.13, 1.15, 2.0, 3.4, 3.44, 4.1,
+                              4.2, 4.3, 4.4);
+        m.printSmallNeighbourhoods();
+    }
+
+}

@@ -1,0 +1,88 @@
+
+
+package self.philbrown.droidQuery;
+
+import android.view.MotionEvent;
+import android.view.View;
+import android.view.ViewConfiguration;
+
+
+public class SwipeDetector implements View.OnTouchListener
+{
+	
+	public static enum Direction
+	{
+		RIGHT, DOWN, UP, LEFT, START, STOP
+	}
+	
+	
+	private int minSwipeDistance = 100;
+	
+	
+    private float downX, downY;
+    
+    
+    private float upX, upY;
+    
+    
+    private View view;
+    
+    
+    private ViewConfiguration config;
+    
+    
+    private SwipeListener listener;
+    
+    public SwipeDetector(SwipeListener listener)
+    {
+    	this.listener = listener;
+    }
+	
+	    // TODO
+
+    
+    
+    public void performSwipeUp()
+    {
+    	if (listener != null)
+    		listener.onUpSwipe(view);
+    }
+    
+    
+    public void performSwipeRight()
+    {
+    	if (listener != null)
+    		listener.onRightSwipe(view);
+    }
+    
+    
+    public void performSwipeLeft()
+    {
+    	if (listener != null)
+    		listener.onLeftSwipe(view);
+    }
+    
+    
+    public void performSwipeDown()
+    {
+    	if (listener != null)
+    		listener.onDownSwipe(view);
+    }
+	
+	
+	public interface SwipeListener
+	{
+		
+		public void onUpSwipe(View v);
+		
+	    public void onRightSwipe(View v);
+	    
+	    public void onLeftSwipe(View v);
+	    
+	    public void onDownSwipe(View v);
+	    
+	    public void onStartSwipe(View v);
+	    
+	    public void onStopSwipe(View v);
+	}
+}

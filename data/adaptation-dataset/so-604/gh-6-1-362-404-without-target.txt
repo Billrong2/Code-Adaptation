@@ -1,0 +1,273 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+package org.chililog.server.common;
+
+import java.security.MessageDigest;
+import java.security.SecureRandom;
+import java.security.spec.AlgorithmParameterSpec;
+import java.security.spec.KeySpec;
+import java.util.Arrays;
+
+import javax.crypto.Cipher;
+import javax.crypto.SecretKey;
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.PBEKeySpec;
+import javax.crypto.spec.SecretKeySpec;
+
+import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.lang.NullArgumentException;
+
+
+public class CryptoUtils {
+
+    private static final byte[] AES_ENCRYPTION_STRING_SALT = new byte[] { 3, 56, 23, 120, 34, 92 };
+    private static final byte[] AES_ENCRYPTION_INTIALIZATION_VECTOR = new byte[] { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05,
+            0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f };
+
+    
+    public static String createMD5Hash(String s) throws ChiliLogException {
+        try {
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            byte[] array = md.digest(s.getBytes("CP1252"));
+            StringBuffer sb = new StringBuffer();
+            for (int i = 0; i < array.length; ++i) {
+                sb.append(Integer.toHexString((array[i] & 0xFF) | 0x100).substring(1, 3));
+            }
+
+            return sb.toString();
+        } catch (Exception ex) {
+            throw new ChiliLogException(ex, "Error attempting to MD5 hash: " + ex.getMessage());
+        }
+    }
+
+    
+    public static String createSHA512Hash(String plainTextValue, byte[] salt) throws ChiliLogException {
+        try {
+            SecureRandom random = SecureRandom.getInstance("SHA1PRNG");
+            
+            salt = new byte[8];
+            random.nextBytes(salt);
+
+            return createSHA512Hash(plainTextValue, salt, true);
+        } catch (Exception ex) {
+            throw new ChiliLogException(ex, "Error attempting to hash passwords. " + ex.getMessage());
+        }
+    }
+
+    
+    public static String createSHA512Hash(String plainTextValue, byte[] salt, boolean appendSalt)
+            throws ChiliLogException {
+        try {
+            if (plainTextValue == null) {
+                throw new NullArgumentException("plainTextValue");
+            }
+            if (salt == null) {
+                throw new NullArgumentException("salt");
+            }
+
+            
+            byte[] plainTextBytes = plainTextValue.getBytes("UTF-8");
+
+            
+            byte[] plainTextWithSaltBytes = new byte[plainTextBytes.length + salt.length];
+
+            
+            for (int i = 0; i < plainTextBytes.length; i++) {
+                plainTextWithSaltBytes[i] = plainTextBytes[i];
+            }
+
+            
+            if (appendSalt) {
+                for (int i = 0; i < salt.length; i++) {
+                    plainTextWithSaltBytes[plainTextBytes.length + i] = salt[i];
+                }
+            }
+
+            
+            MessageDigest digest = MessageDigest.getInstance("SHA-512");
+            digest.reset();
+            byte[] hashBytes = digest.digest(plainTextWithSaltBytes);
+
+            
+            byte[] hashWithSaltBytes = new byte[hashBytes.length + salt.length];
+
+            
+            for (int i = 0; i < hashBytes.length; i++) {
+                hashWithSaltBytes[i] = hashBytes[i];
+            }
+
+            
+            for (int i = 0; i < salt.length; i++) {
+                hashWithSaltBytes[hashBytes.length + i] = salt[i];
+            }
+
+            
+            Base64 encoder = new Base64(1000, new byte[] {}, false);
+            return encoder.encodeToString(hashWithSaltBytes);
+        } catch (Exception ex) {
+            throw new ChiliLogException(ex, "Error attempting to hash passwords. " + ex.getMessage());
+        }
+    }
+
+    
+    public static boolean verifyHash(String plainTextValue, String hashValue) throws ChiliLogException {
+        return verifyHash(plainTextValue, null, hashValue);
+    }
+
+    
+    public static boolean verifyHash(String plainTextValue, byte[] salt, String hashValue) throws ChiliLogException {
+        try {
+            if (plainTextValue == null) {
+                throw new NullArgumentException("plainTextValue");
+            }
+
+            
+            Base64 decoder = new Base64(1000, new byte[] {}, false);
+            byte[] hashWithSaltBytes = decoder.decode(hashValue);
+
+            
+            int hashSizeInBits, hashSizeInBytes;
+
+            
+            hashSizeInBits = 512;
+
+            
+            hashSizeInBytes = hashSizeInBits / 8;
+
+            
+            if (hashWithSaltBytes.length < hashSizeInBytes) {
+                return false;
+            }
+
+            
+            boolean saltAppended = (salt == null);
+            byte[] saltBytes = salt;
+            if (saltAppended) {
+                
+                saltBytes = new byte[hashWithSaltBytes.length - hashSizeInBytes];
+
+                
+                for (int i = 0; i < saltBytes.length; i++) {
+                    saltBytes[i] = hashWithSaltBytes[hashSizeInBytes + i];
+                }
+            }
+
+            
+            String expectedHashString = createSHA512Hash(plainTextValue, saltBytes, saltAppended);
+
+            
+            
+            return (hashValue.equals(expectedHashString));
+        } catch (Exception ex) {
+            throw new ChiliLogException(ex, "Error attempting to verify passwords. " + ex.getMessage());
+        }
+    }
+
+    
+    public static String encryptAES(String plainText, String password) throws ChiliLogException {
+        try {
+            SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1");
+            KeySpec spec = new PBEKeySpec(password.toCharArray(), AES_ENCRYPTION_STRING_SALT, 1024, 128);
+            SecretKey tmp = factory.generateSecret(spec);
+            SecretKey secret = new SecretKeySpec(tmp.getEncoded(), "AES");
+
+            byte[] plainTextBytes = plainText.getBytes("UTF-8");
+
+            AlgorithmParameterSpec paramSpec = new IvParameterSpec(AES_ENCRYPTION_INTIALIZATION_VECTOR);
+            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+            cipher.init(Cipher.ENCRYPT_MODE, secret, paramSpec);
+            byte[] cipherText = cipher.doFinal(plainTextBytes);
+
+            
+            Base64 encoder = new Base64(1000, new byte[] {}, false);
+            return encoder.encodeToString(cipherText);
+        } catch (Exception ex) {
+            throw new ChiliLogException(ex, "Error attempting to encrypt. " + ex.getMessage());
+        }
+    }
+
+    
+    public static String decryptAES(String encryptedText, String password) throws ChiliLogException {
+        try {
+            SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1");
+            KeySpec spec = new PBEKeySpec(password.toCharArray(), AES_ENCRYPTION_STRING_SALT, 1024, 128);
+            SecretKey tmp = factory.generateSecret(spec);
+            SecretKey secret = new SecretKeySpec(tmp.getEncoded(), "AES");
+
+            Base64 decoder = new Base64(1000, new byte[] {}, false);
+            byte[] encryptedTextBytes = decoder.decode(encryptedText);
+
+            AlgorithmParameterSpec paramSpec = new IvParameterSpec(AES_ENCRYPTION_INTIALIZATION_VECTOR);
+            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+            cipher.init(Cipher.DECRYPT_MODE, secret, paramSpec);
+            byte[] plainTextBytes = cipher.doFinal(encryptedTextBytes);
+
+            return new String(plainTextBytes, "UTF-8");
+        } catch (Exception ex) {
+            throw new ChiliLogException(ex, "Error attempting to decrpt. " + ex.getMessage());
+        }
+    }
+
+    
+    public static String encryptTripleDES(String plainText, String password) throws ChiliLogException {
+        try {
+            return encryptTripleDES(plainText, password.getBytes("UTF-8"));
+        } catch (Exception ex) {
+            throw new ChiliLogException(ex, "Error attempting to encrypt. " + ex.getMessage());
+        }
+    }
+
+        // TODO
+
+
+    
+    public static String decryptTripleDES(String encryptedText, String password) throws ChiliLogException {
+        try {
+            return decryptTripleDES(encryptedText, password.getBytes("UTF-8"));
+        } catch (Exception ex) {
+            throw new ChiliLogException(ex, "Error attempting to decrpt. " + ex.getMessage());
+        }
+    }
+
+    
+    public static String decryptTripleDES(String encryptedText, byte[] password) throws ChiliLogException {
+        try {
+            final MessageDigest md = MessageDigest.getInstance("md5");
+            final byte[] digestOfPassword = md.digest(password);
+            final byte[] keyBytes = Arrays.copyOf(digestOfPassword, 24);
+            for (int j = 0, k = 16; j < 8;) {
+                keyBytes[k++] = keyBytes[j++];
+            }
+
+            Base64 decoder = new Base64(1000, new byte[] {}, false);
+            byte[] encryptedTextBytes = decoder.decode(encryptedText);
+
+            final SecretKey key = new SecretKeySpec(keyBytes, "DESede");
+            final IvParameterSpec iv = new IvParameterSpec(new byte[8]);
+            final Cipher decipher = Cipher.getInstance("DESede/CBC/PKCS5Padding");
+            decipher.init(Cipher.DECRYPT_MODE, key, iv);
+            final byte[] plainTextBytes = decipher.doFinal(encryptedTextBytes);
+
+            return new String(plainTextBytes, "UTF-8");
+        } catch (Exception ex) {
+            throw new ChiliLogException(ex, "Error attempting to decrpt. " + ex.getMessage());
+        }
+    }
+}

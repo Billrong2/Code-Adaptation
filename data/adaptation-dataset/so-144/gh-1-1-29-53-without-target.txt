@@ -1,0 +1,31 @@
+package com.example.dialog;
+
+import android.app.TimePickerDialog;
+import android.content.Context;
+import android.content.DialogInterface;
+import android.text.format.DateFormat;
+import android.widget.TimePicker;
+
+import java.util.Calendar;
+
+
+
+public class FixedTimePickerDialog extends TimePickerDialog
+{
+	public FixedTimePickerDialog(Calendar timeToShow, Context context, OnTimeSetListener callBack)
+	{
+		super(context, null, timeToShow.get(Calendar.HOUR_OF_DAY), timeToShow.get(Calendar.MINUTE), DateFormat.is24HourFormat(context));
+		initializePicker(callBack);
+	}
+
+
+	public FixedTimePickerDialog(Calendar timeToShow, Context context, int theme, OnTimeSetListener callBack)
+	{
+		super(context, theme, null, timeToShow.get(Calendar.HOUR_OF_DAY), timeToShow.get(Calendar.MINUTE), DateFormat.is24HourFormat(context));
+		initializePicker(callBack);
+	}
+
+
+	// TODO
+
+}

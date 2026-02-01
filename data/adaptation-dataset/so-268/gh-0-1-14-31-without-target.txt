@@ -1,0 +1,26 @@
+package com.stevenschoen.imagesearchernew;
+
+import android.database.Cursor;
+import android.database.MatrixCursor;
+import android.net.Uri;
+import android.provider.MediaStore;
+
+import java.util.Arrays;
+
+
+
+public class FixedFileProvider extends android.support.v4.content.FileProvider {
+
+    // TODO
+
+
+    private String[] columnNamesWithData(String[] columnNames) {
+        for (String columnName : columnNames)
+            if (MediaStore.MediaColumns.DATA.equals(columnName))
+                return columnNames;
+
+        String[] newColumnNames = Arrays.copyOf(columnNames, columnNames.length + 1);
+        newColumnNames[columnNames.length] = MediaStore.MediaColumns.DATA;
+        return newColumnNames;
+    }
+}

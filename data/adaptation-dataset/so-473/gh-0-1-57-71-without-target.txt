@@ -1,0 +1,44 @@
+
+package jsettlers.main.swing;
+
+import java.awt.*;
+import java.awt.image.BufferedImage;
+
+import jsettlers.logic.map.loading.MapLoader;
+import jsettlers.logic.map.loading.newmap.MapFileHeader;
+
+
+public class JSettlersSwingUtil {
+
+	public static final Color DISABLE_COLOR = new Color(28, 34, 40, 150);
+
+	public static BufferedImage createBufferedImageFrom(MapLoader mapLoader) {
+		short[] data = mapLoader.getImage();
+		int xOffset = MapFileHeader.PREVIEW_IMAGE_SIZE;
+		BufferedImage img = new BufferedImage(MapFileHeader.PREVIEW_IMAGE_SIZE + xOffset,
+				MapFileHeader.PREVIEW_IMAGE_SIZE, BufferedImage.TYPE_INT_ARGB);
+
+		xOffset--;
+		for (int y = 0; y < MapFileHeader.PREVIEW_IMAGE_SIZE; y++) {
+			for (int x = 0; x < MapFileHeader.PREVIEW_IMAGE_SIZE; x++) {
+				int index = y * MapFileHeader.PREVIEW_IMAGE_SIZE + x;
+				jsettlers.common.Color c = jsettlers.common.Color.fromShort(data[index]);
+				img.setRGB(x + xOffset, y, c.getARGB());
+			}
+			if (xOffset > 1 && (y % 2 == 0)) {
+				xOffset--;
+			}
+		}
+
+		return img;
+	}
+
+	public static BufferedImage createDisabledImage(BufferedImage image) {
+		return JSettlersSwingUtil.dye(image, DISABLE_COLOR);
+	}
+
+
+		// TODO
+
+
+}

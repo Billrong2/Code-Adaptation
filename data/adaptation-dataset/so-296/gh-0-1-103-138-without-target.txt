@@ -1,0 +1,98 @@
+package de.fencing_game.paul.examples;
+
+import java.io.*;
+import java.security.*;
+
+
+public class SignatureOutputStream
+    extends OutputStream
+{
+
+    private OutputStream target;
+    private Signature sig;
+
+    
+    public SignatureOutputStream(OutputStream target, Signature sig) {
+        this.target = target;
+        this.sig = sig;
+    }
+
+    public void write(int b)
+        throws IOException
+    {
+        write(new byte[]{(byte)b});
+    }
+
+    public void write(byte[] b)
+        throws IOException
+    {
+        write(b, 0, b.length);
+    }
+
+    public void write(byte[] b, int offset, int len)
+        throws IOException
+    {
+        target.write(b, offset, len);
+        try {
+            sig.update(b, offset, len);
+        }
+        catch(SignatureException ex) {
+            throw new IOException(ex);
+        }
+    }
+
+    public void flush() 
+        throws IOException
+    {
+        target.flush();
+    }
+
+    public void close() 
+        throws IOException
+    {
+        target.close();
+    }
+
+
+    private static byte[] signData(OutputStream target,
+                                   PrivateKey key, String[] data)
+        throws IOException, GeneralSecurityException
+    {
+        Signature sig = Signature.getInstance("SHA1withRSA");
+        sig.initSign(key);
+        DataOutputStream dOut =
+            new DataOutputStream(new SignatureOutputStream(target, sig));
+        
+
+        for(String s : data) {
+            dOut.writeUTF(s);
+        }
+        byte[] signature = sig.sign();
+        return signature;
+    }
+
+
+    private static void verify(PublicKey key, byte[] signature,
+                                  byte[] data)
+        throws IOException, GeneralSecurityException
+    {
+        Signature sig = Signature.getInstance("SHA1withRSA");
+        sig.initVerify(key);
+        
+        ByteArrayOutputStream collector =
+            new ByteArrayOutputStream(data.length);
+        OutputStream checker = new SignatureOutputStream(collector, sig);
+        checker.write(data);
+        if(sig.verify(signature)) {
+            System.err.println("Signature okay");
+        }
+        else {
+            System.err.println("Signature falsed!");
+        }
+    }
+
+
+        // TODO
+
+
+}

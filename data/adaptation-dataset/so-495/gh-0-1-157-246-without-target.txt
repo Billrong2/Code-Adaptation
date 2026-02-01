@@ -1,0 +1,158 @@
+
+
+package com.sun.enterprise.admin.cli;
+
+import java.util.*;
+import java.util.regex.*;
+
+import org.jvnet.hk2.annotations.Service;
+import org.glassfish.api.Param;
+import org.glassfish.api.admin.*;
+import org.glassfish.hk2.api.PerLookup;
+
+import com.sun.enterprise.universal.i18n.LocalStringsImpl;
+
+import javax.inject.Inject;
+
+import static com.sun.enterprise.admin.cli.CLIConstants.EOL;
+
+
+@Service(name = "list-commands")
+@PerLookup
+public class ListCommandsCommand extends CLICommand {
+    @Inject
+    private CLIContainer container;
+
+    private String[] remoteCommands;
+    private String[] localCommands;
+    private List<Pattern> patterns = new ArrayList<Pattern>();
+
+    @Param(name = "localonly", optional = true)
+    private boolean localOnly;
+
+    @Param(name = "remoteonly", optional = true)
+    private boolean remoteOnly;
+
+    @Param(name = "command-pattern", primary = true, optional = true,
+	    multiple = true)
+    private List<String> cmds;
+
+    private static final String SPACES = "                                                            ";
+
+    private static final LocalStringsImpl strings =
+            new LocalStringsImpl(ListCommandsCommand.class);
+
+    @Override
+    protected void validate()
+            throws CommandException, CommandValidationException {
+        if (localOnly && remoteOnly) {
+            throw new CommandException(strings.get("listCommands.notBoth"));
+        }
+    }
+
+    @Override
+    public int executeCommand()
+            throws CommandException, CommandValidationException {
+
+        
+        if (cmds != null)
+            for (String pat : cmds)
+                patterns.add(Pattern.compile(globToRegex(pat)));
+
+        
+        if (!localOnly) {
+            try {
+                remoteCommands = matchCommands(
+                    CLIUtil.getRemoteCommands(container, programOpts, env));
+            } catch (CommandException ce) {
+                
+                throw new CommandException(ce.getMessage());
+            }
+        }
+
+        if (!remoteOnly) {
+            localCommands = matchCommands(CLIUtil.getLocalCommands(container));
+            printLocalCommands();
+        }
+        if (!localOnly && !remoteOnly)
+            logger.info("");            
+        if (!localOnly)
+            printRemoteCommands();
+        logger.info("");
+        return 0;
+    }
+
+    
+    private String[] matchCommands(String[] commands) {
+        
+        List<String> matched = new ArrayList<String>();
+        for (String cmd : commands) {
+            if (patterns.size() == 0) {
+                if (!cmd.startsWith("_"))
+                    matched.add(cmd);
+            } else {
+                for (Pattern re : patterns)
+                    if (re.matcher(cmd).find())
+                        if (!cmd.startsWith("_") ||
+                                re.pattern().startsWith("_"))
+                            matched.add(cmd);
+            }
+        }
+
+        return matched.toArray(new String[matched.size()]);
+    }
+
+        // TODO
+
+
+
+    void printLocalCommands() {
+        if (localCommands.length == 0) {
+            logger.info(
+                            strings.get("listCommands.localCommandNoMatch"));
+            return;
+        }
+        logger.info(strings.get("listCommands.localCommandHeader"));
+
+        for (String s : localCommands) {
+            logger.info(s);
+        }
+    }
+
+    void printRemoteCommands() {
+        if (remoteCommands.length == 0) {
+            logger.info(
+                            strings.get("listCommands.remoteCommandNoMatch"));
+            return;
+        }
+
+        logger.info(strings.get("listCommands.remoteCommandHeader"));
+        
+        
+        int num = remoteCommands.length;
+        int offset = (num / 2) + (num % 2);
+        StringBuilder sb = new StringBuilder();
+ 
+        for (int i = 0; i < offset; i++) {
+            sb.append(remoteCommands[i]);
+            sb.append(justify(remoteCommands[i], 40));
+            if (i + offset < num) {
+                sb.append(remoteCommands[i + offset]);
+            }
+            if (i < offset - 1)
+                sb.append(EOL);
+        }
+        logger.info(sb.toString());
+    }
+ 
+    private String justify(String s, int width) {
+        int numSpaces = width - s.length();
+
+        if (numSpaces > 0)
+            return SPACES.substring(0, numSpaces);
+        else
+            
+            
+            return " "; 
+    }
+}

@@ -1,0 +1,30 @@
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.HashMap;
+import java.util.Stack;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.parsers.SAXParser;
+import javax.xml.parsers.SAXParserFactory;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.xml.sax.Attributes;
+import org.xml.sax.Locator;
+import org.xml.sax.SAXException;
+import org.xml.sax.helpers.DefaultHandler;
+
+
+
+public class PositionalXMLReader {
+    final static String LINE_NUMBER_KEY_NAME = "lineNumber";
+    final static String COLUMN_NUMBER_KEY_NAME = "columnNumber";
+	protected static final String LINE_NUMBER_LAST_KEY_NAME = "lineNumberLast";
+	protected static final String COLUMN_NUMBER_LAST_KEY_NAME = "columnNumberLast";
+	private static final HashMap<String, Integer> ELEMENT_NAMES_COUNTER = new HashMap<String, Integer>();
+	protected static final String ELEMENT_ID = "elementId";
+
+    // TODO
+
+}

@@ -1,0 +1,15 @@
+package com.miz.utils;
+
+import org.apache.http.conn.util.InetAddressUtils;
+
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.util.Collections;
+import java.util.List;
+
+public class NetworkUtils {
+
+        // TODO
+
+
+}

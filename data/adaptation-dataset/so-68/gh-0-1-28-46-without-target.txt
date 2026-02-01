@@ -1,0 +1,58 @@
+package de.fencing_game.paul.examples.doclet;
+
+import com.sun.javadoc.*;
+import java.util.ArrayList;
+
+
+public class GenericTestDoclet<Y> extends Doclet {
+
+    public ArrayList<? extends Y> stringList;
+
+    
+    public GenericTestDoclet() {
+
+    }
+
+
+    public ArrayList<? extends Y> getList() {
+        return stringList;
+    }
+
+    // TODO
+
+
+
+    public void listFields(ClassDoc classDoc, DocErrorReporter err) {
+        FieldDoc[] fields = classDoc.fields();
+        for (int k = 0; k < fields.length; k++) {
+            err.printNotice("field: " + fields[k]);
+            Type fieldType = fields[k].type();
+            printType(fieldType, err);
+        }
+    }
+
+
+    public void listMethods(ClassDoc classDoc, DocErrorReporter err) {
+        MethodDoc[] methods = classDoc.methods();
+        for (int k = 0; k < methods.length; k++) {
+            err.printNotice("method: " + methods[k]);
+            Type returnType = methods[k].returnType();
+            printType(returnType, err);
+        }
+    }
+
+
+
+    
+    public static boolean start(RootDoc root) {
+        GenericTestDoclet<?> d = new GenericTestDoclet<Integer>();
+        for(ClassDoc clazz : root.classes()) {
+            d.listFields(clazz, root);
+            d.listMethods(clazz, root);
+        }
+        return true;
+    }
+
+
+
+}

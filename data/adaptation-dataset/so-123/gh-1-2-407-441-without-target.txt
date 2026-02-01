@@ -1,0 +1,626 @@
+
+
+
+
+package com.briankhuu.nfcmessageboard;
+
+import android.app.Activity;
+import android.app.PendingIntent;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.nfc.FormatException;
+import android.nfc.NdefMessage;
+import android.nfc.NdefRecord;
+import android.nfc.NfcAdapter;
+import android.nfc.Tag;
+import android.nfc.tech.Ndef;
+import android.nfc.tech.NdefFormatable;
+import android.os.Vibrator;
+import android.support.v7.app.AppCompatActivity;
+import android.os.Bundle;
+import android.util.Log;
+import android.view.View;
+import android.widget.Button;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.util.concurrent.ThreadLocalRandom;
+
+public class WritingToTextTag extends AppCompatActivity {
+    static String arrPackageName = "com.briankhuu.nfcmessageboard";
+    private static final String LOGGER_TAG = WritingToTextTag.class.getSimpleName();
+
+    
+    Context ctx;
+
+    
+    Tag tag;
+    private NfcAdapter mNfcAdapter; 
+
+    
+    Vibrator vibrator;
+
+    
+    public static TextView textView_infoDisp;
+
+    
+    public enum MessageWriteStatus_Enum {
+        INITIALISE,                         
+        SUCCESS,                            
+        FAILED,                             
+        FAILED_BECAUSE_CONTENT_MISMATCH,    
+        FAILED_BECAUSE_IO_EXCEPTION,
+        FAILED_BECAUSE_FORMAT_EXCEPTION,
+        FAILED_BECAUSE_TAG_LOST,
+        FAILED_BECAUSE_NULL_NDEF,
+        FAILED_BECAUSE_INSUFFICIENT_SPACE,
+        FAILED_BECAUSE_WRITE_PROTECTED         
+    }
+
+    
+    public enum MessageMode_Enum {
+        SIMPLE_TXT_MODE,        
+        STRUCTURED_TXT_MODE     
+    }
+
+
+    
+    public class TagContent {
+        MessageWriteStatus_Enum successfulWrite_status = MessageWriteStatus_Enum.INITIALISE;
+        MessageMode_Enum message_mode = MessageMode_Enum.SIMPLE_TXT_MODE;
+        String message_str = "";
+    }
+
+    TagContent tagContent = new TagContent();
+
+    
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_writing_to_text_tag);
+
+        
+
+        
+        ctx = this;
+
+
+        
+        vibrator = (Vibrator) this.getSystemService(Context.VIBRATOR_SERVICE);
+
+        
+        textView_infoDisp = (TextView) findViewById(R.id.textView_infoDisp);
+
+        
+
+        
+        mNfcAdapter = NfcAdapter.getDefaultAdapter(this); 
+
+        if (mNfcAdapter == null) {   
+            Toast.makeText(this, "This device does not support NFC.", Toast.LENGTH_LONG).show();
+            finish(); 
+            return;
+        }
+
+        if (!mNfcAdapter.isEnabled()) {   
+            Toast.makeText(this, "NFC is disabled.", Toast.LENGTH_LONG).show();
+            finish();
+            return;
+        }
+
+
+        
+
+        
+        String message_tag_type_str = getIntent().getStringExtra("tag_type");
+
+        if (message_tag_type_str == null) {   
+            int random_number = ThreadLocalRandom.current().nextInt(0, 1000 + 1);
+
+            
+            this.tagContent.message_mode = MessageMode_Enum.SIMPLE_TXT_MODE;
+            this.tagContent.message_str = "This is an example text content to be included into this tag (" + Integer.toString(random_number) + ")";
+
+        } else {   
+
+            
+            if (message_tag_type_str.equals("txt"))
+                this.tagContent.message_mode = MessageMode_Enum.SIMPLE_TXT_MODE;
+            if (message_tag_type_str.equals("struct-text"))
+                this.tagContent.message_mode = MessageMode_Enum.STRUCTURED_TXT_MODE;
+
+            
+            this.tagContent.message_str = getIntent().getStringExtra("tag_content");
+
+        }
+
+
+        
+
+        
+        final Button button_write_tag = (Button) findViewById(R.id.button_cancel);
+        button_write_tag.setOnClickListener(
+                new View.OnClickListener()
+                {
+                    public void onClick(View v) {
+                        completed_and_now_returning(false); 
+                    }
+                }
+            );
+
+
+
+    }
+
+    @Override
+    protected void onStart()
+    {
+        super.onStart();
+    }
+
+    @Override
+    protected void onRestart()
+    {
+        super.onRestart();
+    }
+
+    @Override
+    protected void onResume()
+    {   
+        super.onResume();   
+        setupForegroundDispatch(this, mNfcAdapter);
+    }
+
+    @Override
+    protected void onPause()
+    {   
+        stopForegroundDispatch(this, mNfcAdapter);
+        super.onPause();    
+    }
+
+    @Override
+    protected void onStop()
+    {
+        super.onStop();
+    }
+
+    @Override
+    protected void onDestroy()
+    {   
+        super.onDestroy();
+    }
+
+    
+
+
+    
+    protected void completed_and_now_returning(boolean write_successful)
+    {
+        Intent resultIntent = new Intent();
+        resultIntent.putExtra("extra stuff","lol");
+
+        if (write_successful)
+        {   
+            setResult(Activity.RESULT_OK, resultIntent);
+        }
+        else
+        {   
+            setResult(Activity.RESULT_CANCELED, resultIntent);
+        }
+
+        
+        finish();
+    }
+
+    
+
+    
+
+    @Override
+    protected void onNewIntent(Intent intent)
+    {   
+
+        
+        if (intent == null)
+        {
+            Log.e( LOGGER_TAG,  "onNewIntent:"
+                        +(intent==null?"null intent,":"")
+                        );
+            return;
+        }
+
+        handle_NfcAdapter_Intent(intent);
+    }
+
+    
+    public static void setupForegroundDispatch(final Activity activity, NfcAdapter adapter)
+    {
+        final Intent        intent;
+        final PendingIntent pendingIntent;
+
+        
+        if ((activity == null)||(adapter == null))
+        {
+            Log.e( LOGGER_TAG, "setupForegroundDispatch:"
+                            +(activity==null?"null activity,":"")
+                            +(adapter==null?"null adapter,":"" )
+                            );
+            return;
+        }
+
+        
+        intent = new Intent(activity.getApplicationContext(), activity.getClass());
+        intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        pendingIntent = PendingIntent.getActivity(activity.getApplicationContext(), 0, intent, 0);
+
+        
+        IntentFilter[]  filters     = new IntentFilter[1];
+        String[][]      techList    = new String[][]{};
+
+        
+        filters[0] = new IntentFilter();
+        filters[0].addAction(NfcAdapter.ACTION_TAG_DISCOVERED);
+        filters[0].addCategory(Intent.CATEGORY_DEFAULT);
+
+        
+        adapter.enableForegroundDispatch(activity, pendingIntent, filters, techList);
+
+    }
+
+    
+    public static void stopForegroundDispatch(final Activity activity, NfcAdapter adapter)
+    {
+        
+        if ((activity == null)||(adapter == null))
+        {
+            Log.e( LOGGER_TAG, "setupForegroundDispatch:"
+                            +(activity==null?"null activity,":"")
+                            +(adapter==null?"null adapter,":"" )
+                            );
+            return;
+        }
+
+        
+        adapter.disableForegroundDispatch(activity);
+    }
+
+
+    private void resetForegroundDispatch()
+    {   
+        stopForegroundDispatch(this, mNfcAdapter);
+        setupForegroundDispatch(this, mNfcAdapter);
+    }
+
+    
+
+    
+    private void handle_NfcAdapter_Intent(Intent intent)
+    {   
+
+        
+        tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
+
+        if(tag==null)
+        {  
+            Log.e( LOGGER_TAG, "handle_NfcAdapter_Intent:"
+                    +"Intent Extra NfcAdapter.EXTRA_TAG Missing"
+            );
+            return;
+        }
+
+        Log.d( LOGGER_TAG, "Writing tag");
+
+        writeMessageTag(this.tagContent,tag);
+
+        return;
+    }
+
+
+    
+
+    
+    private NdefRecord createRecord(String text) throws UnsupportedEncodingException
+    {
+        
+        
+        String lang = "en";
+        byte[] textBytes = text.getBytes();
+        byte[] langBytes = lang.getBytes("US-ASCII");
+        byte[] payload;
+        int langLength = langBytes.length;
+        int textLength = textBytes.length;
+
+        
+        payload = new byte[1 + langLength + textLength];
+        payload[0] = (byte) langLength;
+
+        
+        System.arraycopy(langBytes, 0, payload, 1, langLength);
+        System.arraycopy(textBytes, 0, payload, 1 + langLength, textLength);
+
+        
+        NdefRecord recordNFC = new NdefRecord(NdefRecord.TNF_WELL_KNOWN, NdefRecord.RTD_TEXT, new byte[0], payload);
+        return recordNFC;
+    }
+
+        // TODO
+
+
+
+    private void writeMessageTag(TagContent tagContent_input, Tag tag) 
+    {
+        NdefRecord text_NdefRecord          = null;
+        NdefRecord androidAAR_NdefRecord;
+        int tag_size=0;
+
+        if ((tag == null))
+        {
+            Log.e( LOGGER_TAG, "setupForegroundDispatch:"
+                    +(tag==null ? "tag adapter," : "" )
+            );
+            textView_infoDisp.setText("tag missing?");
+            return;
+        }
+
+        {
+            
+            Ndef ndefTag = Ndef.get(tag);
+
+            if (ndefTag == null)
+            {   
+                Log.d(LOGGER_TAG, "New tag detected. Attempting to format tag.");
+
+                NdefMessage emptyNdefMessage = new NdefMessage(new NdefRecord(NdefRecord.TNF_EMPTY, null, null, null));
+
+                NdefFormatable formatable = NdefFormatable.get(tag);
+                if (formatable != null)
+                {
+                    try
+                    {
+                        formatable.connect();
+                        formatable.format(emptyNdefMessage);
+                    }
+                    catch (Exception e)
+                    {
+                        
+                        Log.e(LOGGER_TAG, "Tag Refuse to Connect for formatting");
+                        textView_infoDisp.setText("Tag Refuse to Connect for formatting. Is this tag broken?");
+                        Toast.makeText(ctx, "Tag Refuse to Connect for formatting", Toast.LENGTH_SHORT).show();
+                        e.printStackTrace();
+                        return;
+                    }
+                    finally
+                    {
+                        try
+                        {
+                            formatable.close();
+                        }
+                        catch (IOException e)
+                        {
+                            Log.e(LOGGER_TAG, "Cannot close tag while formatting");
+                            textView_infoDisp.setText("Cannot close tag while formatting. Try tapping again.");
+                            Toast.makeText(ctx, "Cannot close tag while formatting", Toast.LENGTH_SHORT).show();
+                            e.printStackTrace();
+                            return;
+                        }
+                    }
+                }
+                else
+                {
+                    
+                    Log.e(LOGGER_TAG, "Cannot format NFC tag. Is not NdefFormatable");
+                    textView_infoDisp.setText("Cannot format NFC Tag. Try preformatting this tag with some NDEF content. (NXP TagWriter could help here)");
+                    Toast.makeText(ctx, "Cannot format NFC tag. Is not NdefFormatable", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                
+                long[] pattern = {0, 400, 400};
+                vibrator.vibrate(pattern, -1);
+
+                
+                Log.d(LOGGER_TAG, "Tag formatted, please tap again");
+                textView_infoDisp.setText("The tag was previously not formatted to the NDEF standard. Now it should be. Tap again to start writing to the tag.");
+                Toast.makeText(ctx, "New tag was formatted. Please tap again.", Toast.LENGTH_SHORT).show();
+                return;
+
+            }
+
+            
+            tag_size = ndefTag.getMaxSize();
+            Log.d( LOGGER_TAG, "tagsize:" + Integer.toString(tag_size) );
+
+            
+            if (ndefTag.isWritable() != true)
+            {   
+                Log.e( LOGGER_TAG, "setupForegroundDispatch:"
+                        +" Tag Is Not Writable "
+                );
+                Toast.makeText(ctx, "Tag was set to read only.", Toast.LENGTH_SHORT ).show();
+                textView_infoDisp.setText("The tag reported that it was sent to read only. Maybe you got a ready only tag? Or something corrupted the tag.");
+                return;
+            }
+        }
+
+        {
+            androidAAR_NdefRecord = NdefRecord.createApplicationRecord(arrPackageName);
+        }
+
+        {
+
+            
+            String text = tagContent_input.message_str;
+
+            
+            final int AAR_RECORD_BYTE_LENGTH = 50;          
+            final int NDEF_RECORD_HEADER_SIZE = 6;          
+            final int NDEF_STRING_PAYLOAD_HEADER_SIZE = 4;  
+
+            
+            int maxTagByteLength = Math.abs(tag_size - NDEF_RECORD_HEADER_SIZE - NDEF_STRING_PAYLOAD_HEADER_SIZE - AAR_RECORD_BYTE_LENGTH);
+            if (text.length() >= maxTagByteLength) { 
+                
+                text = truncateWhenUTF8(text, maxTagByteLength);
+            }
+
+            
+            try {
+                text_NdefRecord = createRecord(text);
+            } catch (UnsupportedEncodingException e) {
+                e.printStackTrace();
+            }
+        }
+
+        {
+            MessageWriteStatus_Enum message_write_status = MessageWriteStatus_Enum.FAILED; 
+
+            if ((text_NdefRecord == null) || (androidAAR_NdefRecord == null)) {
+                return;
+            }
+
+
+            
+            NdefMessage message = new NdefMessage(new NdefRecord[]{
+                    text_NdefRecord
+                    ,
+                    androidAAR_NdefRecord
+            });
+
+
+            
+            for (int i = 0; i < 5; i++) {
+                message_write_status = writeNdefMessageToTag(message, tag, false);
+
+                Log.d(LOGGER_TAG, "Writing To Tag (attempt: " + Integer.toString(i) + ") Status: " + message_write_status.toString());
+
+                
+                if (message_write_status == MessageWriteStatus_Enum.SUCCESS)
+                    break;  
+
+                
+                if (message_write_status == MessageWriteStatus_Enum.FAILED_BECAUSE_IO_EXCEPTION)
+                    break;  
+            }
+
+            
+            tagContent_input.successfulWrite_status = message_write_status;
+
+            switch (message_write_status) {
+                case INITIALISE:
+                    Toast.makeText(ctx, "FAILED: Did it not write?", Toast.LENGTH_SHORT).show();
+                    textView_infoDisp.setText("Whoa that's amazing. Din't not expect you would see this :S");
+                    break;
+                case SUCCESS:   
+                    
+                    textView_infoDisp.setText("All good. Tag is now written. Returning");
+
+                    
+                    long[] pattern = {0, 200, 200, 200, 200, 200, 200};
+                    vibrator.vibrate(pattern, -1);
+
+                    completed_and_now_returning(true);
+                    break;
+                case FAILED:    
+                    Toast.makeText(ctx, "Tag writing failed for unknown reason. Tap again?", Toast.LENGTH_SHORT).show();
+                    textView_infoDisp.setText("Not sure what happened. Try again.");
+                    break;
+                case FAILED_BECAUSE_CONTENT_MISMATCH: 
+                    Toast.makeText(ctx, "Tag content mismatch. Tap again", Toast.LENGTH_SHORT).show();
+                    textView_infoDisp.setText("There was a possible write corruption. You should tap again to try and fix this.");
+                    break;
+                case FAILED_BECAUSE_IO_EXCEPTION:   
+                    Toast.makeText(ctx, "Cannot Write To Tag. (type:IO). Try again?", Toast.LENGTH_SHORT).show();
+                    textView_infoDisp.setText("There was an IO error. The tag could have been physically misaligned during write. Hold it securely to the phone on the next tap.");
+                    break;
+                case FAILED_BECAUSE_FORMAT_EXCEPTION: 
+                    Toast.makeText(ctx, "Cannot Write To Tag. (type:Format). Not NDEF formatted?", Toast.LENGTH_SHORT).show();
+                    textView_infoDisp.setText("The tag is not yet formatted. Please preformat your tag to use NDEF.");
+                    break;
+                case FAILED_BECAUSE_TAG_LOST:   
+                    Toast.makeText(ctx, "Lost connection to tag. Tap again.", Toast.LENGTH_SHORT).show();
+                    textView_infoDisp.setText("Connection was lost to the tag. Please tap again. Make sure to hold it more securely.");
+                    break;
+                case FAILED_BECAUSE_NULL_NDEF:
+                    Toast.makeText(ctx, "Tag Write Failed: NULL NDEF", Toast.LENGTH_SHORT).show();
+                    textView_infoDisp.setText("NULL NDEF error (not formatted yet?)");
+                    break;
+                case FAILED_BECAUSE_INSUFFICIENT_SPACE:
+                    Toast.makeText(ctx, "Cannot Write To Tag. Message is too big", Toast.LENGTH_SHORT).show();
+                    textView_infoDisp.setText("Message is too big for the tag");
+                    break;
+                case FAILED_BECAUSE_WRITE_PROTECTED:
+                    Toast.makeText(ctx, "Cannot Write To Tag. Tag is Read Only", Toast.LENGTH_SHORT).show();
+                    textView_infoDisp.setText("Tag is write protected. You should use a new one.");
+                    break;
+            }
+
+        }
+
+    }
+
+    public MessageWriteStatus_Enum writeNdefMessageToTag(NdefMessage message, Tag tag, boolean writeProtect)
+    {
+        try {
+            Ndef ndef = Ndef.get(tag);
+            if (ndef != null) {
+                ndef.connect(); 
+
+                if (!ndef.isWritable())
+                {
+                    return MessageWriteStatus_Enum.FAILED_BECAUSE_WRITE_PROTECTED; 
+                }
+
+                if (ndef.getMaxSize() < message.toByteArray().length)
+                {
+                    return MessageWriteStatus_Enum.FAILED_BECAUSE_INSUFFICIENT_SPACE; 
+                }
+
+                ndef.writeNdefMessage(message); 
+
+                if ( writeProtect ==  true ) 
+                {
+                    Toast.makeText(ctx, "Setting Tag to Write Only", Toast.LENGTH_SHORT ).show();
+                    ndef.makeReadOnly();
+                }
+
+                
+                if(ndef.getNdefMessage().equals(message))   
+                {   
+                    return MessageWriteStatus_Enum.SUCCESS;
+                }
+
+
+                ndef.close(); 
+
+
+                
+                return MessageWriteStatus_Enum.FAILED_BECAUSE_CONTENT_MISMATCH;
+
+            } else {
+                return MessageWriteStatus_Enum.FAILED_BECAUSE_NULL_NDEF; 
+            }
+        }
+        catch (IOException e)
+        {   
+            e.printStackTrace();
+            return MessageWriteStatus_Enum.FAILED_BECAUSE_IO_EXCEPTION;
+        }
+        catch (FormatException e)
+        {   
+            e.printStackTrace();
+            return MessageWriteStatus_Enum.FAILED_BECAUSE_FORMAT_EXCEPTION;
+        }
+        catch (NullPointerException e)
+        {   
+            e.printStackTrace();
+            return MessageWriteStatus_Enum.FAILED_BECAUSE_NULL_NDEF;
+        }
+    }
+
+
+} 
+

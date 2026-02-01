@@ -1,0 +1,43 @@
+
+package com.netsteadfast.greenstep.util;
+
+import javax.crypto.Cipher;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
+
+import org.apache.commons.codec.binary.Base64;
+
+import com.netsteadfast.greenstep.base.Constants;
+
+
+public class EncryptorUtils {
+	
+	// TODO
+
+
+    public static String decrypt(String key1, String iv1, String encrypted) {
+        try {
+            IvParameterSpec iv = new IvParameterSpec(iv1.getBytes(Constants.BASE_ENCODING));
+            SecretKeySpec skeySpec = new SecretKeySpec(key1.getBytes(Constants.BASE_ENCODING), "AES");
+            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5PADDING");
+            cipher.init(Cipher.DECRYPT_MODE, skeySpec, iv);
+            byte[] original = cipher.doFinal(Base64.decodeBase64(encrypted));
+            return new String(original);
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+        return null;
+    }
+    
+    public static void main(String[] args) {
+        String key1 = Constants.ENCRYPTOR_KEY1; 
+        String key2 = Constants.ENCRYPTOR_KEY2;
+        String str = "b4da1c48-4b6e-40cf-8232-aa23611b3cf7;1A530637289A03B07199A44E8D531427;admin";
+        String encData = "";
+        System.out.println("encrypt=" + ( encData=encrypt(key1, key2, str) ) );
+        System.out.println("decrypt=" + decrypt(key1, key2, encData) );       
+        System.out.println("encrypt toHex=" + SimpleUtils.toHex(encData) );        
+        
+    }
+    
+}

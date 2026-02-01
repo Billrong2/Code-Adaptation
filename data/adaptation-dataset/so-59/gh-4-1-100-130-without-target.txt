@@ -1,0 +1,87 @@
+
+
+package org.openbmap.utils;
+
+import android.content.Context;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
+import android.os.Bundle;
+
+import java.util.Timer;
+import java.util.TimerTask;
+
+
+public class CurrentLocationHelper {
+	private Timer mTimer;
+	private LocationManager mLocationManager;
+	private LocationResult mLocationResult;
+
+	private boolean mGpsEnabled = false;
+	private boolean mNetworkEnabled = false;
+
+	public boolean getLocation(final Context context, final LocationResult result) {
+		
+		mLocationResult = result;
+		if (mLocationManager ==  null)
+			mLocationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
+
+		
+		try {
+			mGpsEnabled = mLocationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
+		} catch (final Exception ex) {
+
+		}
+
+		try {
+			mNetworkEnabled = mLocationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+		} catch(final Exception ex){
+
+		}
+
+		
+		if (!mGpsEnabled && !mNetworkEnabled)
+			return false;
+
+		if (mGpsEnabled)
+			mLocationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, locationListenerGps);
+		if (mNetworkEnabled)
+			mLocationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, locationListenerNetwork);
+		mTimer = new Timer();
+		mTimer.schedule(new GetLastLocation(), 20000);
+		return true;
+	}
+
+	LocationListener locationListenerGps = new LocationListener() {
+		public void onLocationChanged(final Location location) {
+			mTimer.cancel();
+			mLocationResult.gotLocation(location);
+			mLocationManager.removeUpdates(this);
+			mLocationManager.removeUpdates(locationListenerNetwork);
+		}
+		public void onProviderDisabled(final String provider) {}
+		public void onProviderEnabled(final String provider) {}
+		public void onStatusChanged(final String provider, final int status, final Bundle extras) {}
+	};
+
+	LocationListener locationListenerNetwork = new LocationListener() {
+		public void onLocationChanged(final Location location) {
+			mTimer.cancel();
+			mLocationResult.gotLocation(location);
+			mLocationManager.removeUpdates(this);
+			mLocationManager.removeUpdates(locationListenerGps);
+		}
+		public void onProviderDisabled(final String provider) {}
+		public void onProviderEnabled(final String provider) {}
+		public void onStatusChanged(final String provider, final int status, final Bundle extras) {}
+	};
+
+	class GetLastLocation extends TimerTask {
+		// TODO
+
+	}
+
+	public static abstract class LocationResult{
+		public abstract void gotLocation(Location location);
+	}
+}

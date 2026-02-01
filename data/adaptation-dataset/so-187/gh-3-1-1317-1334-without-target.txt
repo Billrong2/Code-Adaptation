@@ -1,0 +1,3631 @@
+package com.calsignlabs.apde;
+
+import android.annotation.SuppressLint;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.DialogInterface;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.content.res.AssetManager;
+import android.content.res.Configuration;
+import android.graphics.Point;
+import android.graphics.Rect;
+import android.net.Uri;
+import android.os.Bundle;
+import android.os.Environment;
+import android.os.Parcelable;
+import android.preference.PreferenceManager;
+import android.support.design.widget.TabLayout;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.app.Fragment;
+import android.support.v4.app.FragmentStatePagerAdapter;
+import android.support.v4.content.ContextCompat;
+import android.support.v4.view.ViewPager;
+import android.support.v4.widget.DrawerLayout;
+import android.support.v7.app.ActionBarDrawerToggle;
+import android.support.v7.app.AlertDialog;
+import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.PopupMenu;
+import android.support.v7.widget.Toolbar;
+import android.util.SparseArray;
+import android.util.TypedValue;
+import android.view.ContextThemeWrapper;
+import android.view.DragEvent;
+import android.view.Gravity;
+import android.view.KeyEvent;
+import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
+import android.view.MotionEvent;
+import android.view.View;
+import android.view.View.MeasureSpec;
+import android.view.View.OnClickListener;
+import android.view.ViewGroup;
+import android.view.ViewTreeObserver.OnGlobalLayoutListener;
+import android.view.WindowManager;
+import android.view.animation.AccelerateDecelerateInterpolator;
+import android.view.animation.Animation;
+import android.view.animation.RotateAnimation;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
+import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.EditText;
+import android.widget.FrameLayout;
+import android.widget.HorizontalScrollView;
+import android.widget.ImageButton;
+import android.widget.LinearLayout;
+import android.widget.ListView;
+import android.widget.RelativeLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
+
+import com.calsignlabs.apde.build.Build;
+import com.calsignlabs.apde.build.CopyAndroidJarTask;
+import com.calsignlabs.apde.build.Manifest;
+import com.calsignlabs.apde.support.ResizeAnimation;
+import com.calsignlabs.apde.tool.FindReplace;
+import com.calsignlabs.apde.tool.Tool;
+import com.ipaulpro.afilechooser.utils.FileUtils;
+
+import org.xml.sax.SAXException;
+
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.PrintStream;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map.Entry;
+import java.util.Stack;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import javax.xml.parsers.ParserConfigurationException;
+
+import processing.data.XML;
+
+
+public class EditorActivity extends AppCompatActivity {
+	
+	private HashMap<String, KeyBinding> keyBindings;
+	
+	public Toolbar toolbar;
+	
+	public ViewPager codePager;
+	public FragmentStatePagerAdapter codePagerAdapter;
+	
+	protected TabLayout codeTabStrip;
+	
+	
+	protected ArrayList<SketchFile> tabs;
+	
+	
+	private boolean saved;
+	
+	
+	private ActionBarDrawerToggle drawerToggle;
+	private boolean drawerOpen;
+	
+	private APDE.SketchLocation drawerSketchLocationType;
+	private String drawerSketchPath;
+	private boolean drawerRecentSketch;
+	
+	
+	protected boolean keyboardVisible;
+	private boolean firstResize = true; 
+	private int oldCodeHeight = -1;
+	private boolean consoleWasHidden = false;
+	
+	private View extraHeaderView;
+	
+	
+	private final static int RENAME_TAB = 0;
+	private final static int NEW_TAB = 1;
+	
+	
+	private MessageTouchListener messageListener;
+	
+	private int message = -1;
+	
+	
+	private PrintStream outStream;
+	private PrintStream errStream;
+	protected AtomicBoolean FLAG_SUSPEND_OUT_STREAM = new AtomicBoolean(false);
+	
+	
+	private BroadcastReceiver consoleBroadcastReceiver;
+	
+	
+	private boolean building;
+	
+	
+	private boolean errorMessage = false;
+	
+	
+	private boolean charInserts = false;
+	
+	
+	private ImageButton toggleCharInserts;
+	
+	private boolean twoFingerSwipe = false;
+	
+	
+	public static final int FLAG_DELETE_APK = 5;
+	
+    @SuppressLint("NewApi")
+	@Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_editor);
+		
+		toolbar = (Toolbar) findViewById(R.id.toolbar);
+		toolbar.setBackgroundColor(getResources().getColor(R.color.bar_overlay));
+		setSupportActionBar(toolbar);
+		
+		
+		outStream = new PrintStream(new ConsoleStream());
+		errStream = new PrintStream(new ConsoleStream());
+		
+		
+		System.setOut(outStream);
+		System.setErr(errStream);
+		
+		
+		consoleBroadcastReceiver = new BroadcastReceiver() {
+			@Override
+			public void onReceive(Context context, Intent intent) {
+				String message = intent.getStringExtra("com.calsignlabs.apde.LogMessage");
+				String exception = intent.getStringExtra("com.calsignlabs.apde.LogException");
+				
+				
+				switch (intent.getCharExtra("com.calsignlabs.apde.LogSeverity", 'o')) {
+				case 'o':
+					postConsole(message);
+					break;
+				case 'e':
+					postConsole(message);
+					break;
+				case 'x':
+					errorExt(message != null ? exception.concat(": ").concat(message) : exception);
+					break;
+				}
+			}
+		};
+		
+		
+		registerReceiver(consoleBroadcastReceiver, new IntentFilter("com.calsignlabs.apde.LogBroadcast"));
+		
+		getGlobalState().initTaskManager();
+		
+		
+		getGlobalState().getSketchbookDrive();
+		
+		
+		tabs = new ArrayList<SketchFile>();
+        
+		codePager = (ViewPager) findViewById(R.id.code_pager);
+		codePagerAdapter = new FragmentStatePagerAdapter(getSupportFragmentManager()) {
+			@Override
+			public int getCount() {
+				return tabs.size();
+			}
+			
+			@Override
+			public CharSequence getPageTitle(int position) {
+				return tabs.get(position).getTitle();
+			}
+			
+			@Override
+			public Fragment getItem(int position) {
+				return tabs.get(position).getFragment();
+			}
+			
+			@Override
+			public int getItemPosition(Object object) {
+				
+				
+				
+				return POSITION_NONE;
+			}
+		};
+		codePager.setAdapter(codePagerAdapter);
+		
+		codeTabStrip = (TabLayout) findViewById(R.id.code_pager_tabs);
+		codeTabStrip.setBackgroundColor(getResources().getColor(R.color.bar_overlay));
+		codeTabStrip.setSelectedTabIndicatorColor(getResources().getColor(R.color.holo_select));
+		codeTabStrip.setSelectedTabIndicatorHeight((int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 5, getResources().getDisplayMetrics()));
+		codeTabStrip.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
+			@Override
+			public void onTabSelected(TabLayout.Tab tab) {}
+			
+			@Override
+			public void onTabUnselected(TabLayout.Tab tab) {}
+			
+			@Override
+			public void onTabReselected(TabLayout.Tab tab) {
+				View anchor = ((LinearLayout) codeTabStrip.getChildAt(0)).getChildAt(tab.getPosition());
+				EditorActivity.this.onTabReselected(anchor);
+			}
+		});
+		
+        
+        Manifest.loadPermissions(this);
+        
+        
+        messageListener = new MessageTouchListener();
+        
+        
+        findViewById(R.id.buffer).setOnLongClickListener(messageListener);
+        findViewById(R.id.buffer).setOnTouchListener(messageListener);
+        
+        
+        setSaved(false);
+
+		getGlobalState().rebuildToolList();
+		
+        
+        getGlobalState().setEditor(this);
+        
+        
+        getSupportActionBar().setTitle(getGlobalState().getSketchName());
+        
+        
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        int oldVersionNum = prefs.getInt("version_num", -1);
+        int realVersionNum = getGlobalState().appVersionCode();
+		
+		boolean justUpdated = realVersionNum > oldVersionNum;
+        
+        if (justUpdated) {
+        	
+			runUpgradeChanges(oldVersionNum, realVersionNum);
+        	
+        	
+        	SharedPreferences.Editor edit = prefs.edit();
+        	edit.putInt("version_num", realVersionNum);
+        	edit.apply();
+        }
+        
+        
+        final DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer);
+        final ListView drawerList = (ListView) findViewById(R.id.drawer_list);
+        
+        drawerSketchLocationType = null;
+        drawerSketchPath = "";
+        
+        
+        forceDrawerReload();
+        
+        
+        drawerToggle = new ActionBarDrawerToggle(this, drawer, toolbar, R.string.nav_drawer_open, R.string.nav_drawer_close) {
+            @Override
+        	public void onDrawerClosed(View view) {
+				if (isSelectedCodeAreaInitialized()) {
+					getSelectedCodeArea().setEnabled(true);
+				}
+                supportInvalidateOptionsMenu();
+            }
+            
+            @Override
+            public void onDrawerSlide(View drawer, float slide) {
+            	super.onDrawerSlide(drawer, slide);
+            	
+            	if(slide > 0) { 
+					if (isSelectedCodeAreaInitialized()) {
+						getSelectedCodeArea().setEnabled(false);
+					}
+                    supportInvalidateOptionsMenu();
+                    drawerOpen = true;
+                    
+                    
+                    if(drawerSketchLocationType != null) {
+    					getSupportActionBar().setSubtitle(drawerSketchLocationType.toReadableString(getGlobalState()) + drawerSketchPath + "/");
+    				} else {
+    					getSupportActionBar().setSubtitle(null);
+    				}
+            	} else { 
+            		
+					if (isSelectedCodeAreaInitialized()) {
+						getSelectedCodeArea().setEnabled(true);
+					}
+                    supportInvalidateOptionsMenu();
+                    drawerOpen = false;
+                    
+                    
+    				getSupportActionBar().setSubtitle(null);
+            	}
+            }
+            
+            @Override
+            public void onDrawerOpened(View drawerView) {
+				if (isSelectedCodeAreaInitialized()) {
+					getSelectedCodeArea().setEnabled(false);
+				}
+                supportInvalidateOptionsMenu();
+        }};
+        drawer.setDrawerListener(drawerToggle);
+        
+        
+        drawerList.setOnItemClickListener(new ListView.OnItemClickListener() {
+			@Override
+			public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+				FileNavigatorAdapter.FileItem item = ((FileNavigatorAdapter) drawerList.getAdapter()).getItem(position);
+				
+				if (drawerSketchLocationType == null && !drawerRecentSketch) {
+					switch (position) {
+					case 0:
+						drawerSketchLocationType = APDE.SketchLocation.SKETCHBOOK;
+						break;
+					case 1:
+						drawerSketchLocationType = APDE.SketchLocation.EXAMPLE;
+						break;
+					case 2:
+						drawerSketchLocationType = APDE.SketchLocation.LIBRARY_EXAMPLE;
+						break;
+					case 3:
+						drawerSketchLocationType = APDE.SketchLocation.TEMPORARY;
+						break;
+					case 4:
+						drawerRecentSketch = true;
+						break;
+					}
+				} else {
+					switch (item.getType()) {
+					case NAVIGATE_UP:
+						int lastSlash = drawerSketchPath.lastIndexOf('/');
+						if (lastSlash > 0) {
+							drawerSketchPath = drawerSketchPath.substring(0, lastSlash);
+						} else if(drawerSketchPath.length() > 0) {
+							drawerSketchPath = "";
+						} else {
+							drawerSketchLocationType = null;
+						}
+						
+						if (drawerRecentSketch) {
+							drawerRecentSketch = false;
+						}
+						
+						break;
+					case MESSAGE:
+						break;
+					case FOLDER:
+						drawerSketchPath += "/" + item.getText();
+						
+						break;
+					case SKETCH:
+						
+						autoSave();
+						
+						if (drawerRecentSketch) {
+							APDE.SketchMeta sketch = getGlobalState().getRecentSketches().get(position - 1); 
+							
+							loadSketch(sketch.getPath(), sketch.getLocation());
+						} else {
+							loadSketch(drawerSketchPath + "/" + item.getText(), drawerSketchLocationType);
+						}
+						
+						drawer.closeDrawers();
+						
+						break;
+					}
+				}
+				
+				if (drawerSketchLocationType != null) {
+					getSupportActionBar().setSubtitle(drawerSketchLocationType.toReadableString(getGlobalState()) + drawerSketchPath + "/");
+				} else if (drawerRecentSketch) {
+					getSupportActionBar().setSubtitle(getResources().getString(R.string.recent) + "/");
+				} else {
+					getSupportActionBar().setSubtitle(null);
+				}
+				
+				forceDrawerReload();
+			}
+		});
+        
+        
+		drawerList.setOnDragListener(new View.OnDragListener() {
+			final float THRESHOLD = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 100, getResources().getDisplayMetrics());
+			
+			@Override
+			public boolean onDrag(View view, DragEvent event) {
+				
+				
+				
+				switch(event.getAction()) {
+					case DragEvent.ACTION_DRAG_LOCATION:
+						float y = event.getY();
+						float h = drawerList.getHeight();
+						
+						float upDif = y - THRESHOLD;
+						float downDif = y - (h - THRESHOLD);
+						
+						if(upDif < 0) {
+							drawerList.smoothScrollBy((int) upDif, 300);
+						}
+						if(downDif > 0) {
+							drawerList.smoothScrollBy((int) upDif, 300);
+						}
+						
+						break;
+				}
+				
+				return true;
+			}
+		});
+        
+        
+        getSupportActionBar().setHomeButtonEnabled(true);
+        getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        
+        
+        final View activityRootView = findViewById(R.id.content);
+        
+        
+        
+        activityRootView.getViewTreeObserver().addOnGlobalLayoutListener(new OnGlobalLayoutListener() {
+			@SuppressWarnings("deprecation")
+			@Override
+			public void onGlobalLayout() {
+				
+				Rect r = new Rect();
+				activityRootView.getWindowVisibleDisplayFrame(r);
+				int heightDiff = activityRootView.getRootView().getHeight() - (r.bottom - r.top);
+				
+				
+				
+				if (PreferenceManager.getDefaultSharedPreferences(getApplicationContext()).getBoolean("use_hardware_keyboard", false)) {
+					InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+					imm.hideSoftInputFromWindow(activityRootView.getWindowToken(), 0);
+					return;
+				}
+				
+				if (oldCodeHeight == -1) {
+					oldCodeHeight = codePager.getHeight();
+				}
+				
+				if (heightDiff > getResources().getDimension(R.dimen.keyboard_visibility_change_threshold)) { 
+					
+					
+					
+					
+					
+					if (!keyboardVisible) {
+						keyboardVisible = true;
+						
+						if (message == -1) {
+							message = findViewById(R.id.buffer).getHeight();
+						}
+						
+						
+
+						LinearLayout buffer = (LinearLayout) findViewById(R.id.buffer);
+						TextView messageArea = (TextView) findViewById(R.id.message);
+						View console = findViewById(R.id.console_scroller);
+						View content = findViewById(R.id.content);
+						
+						if (firstResize) {
+							firstResize = false;
+						} else {
+							oldCodeHeight = codePager.getHeight();
+						}
+						
+						int totalHeight = content.getHeight() - message - (extraHeaderView != null ? extraHeaderView.getHeight() : 0);
+						
+						if (totalHeight > oldCodeHeight) {
+							codePager.startAnimation(new ResizeAnimation<LinearLayout>(codePager, ResizeAnimation.DEFAULT, ResizeAnimation.DEFAULT, ResizeAnimation.DEFAULT, totalHeight));
+							console.startAnimation(new ResizeAnimation<LinearLayout>(console, ResizeAnimation.DEFAULT, ResizeAnimation.DEFAULT, ResizeAnimation.DEFAULT, 0));
+						} else {
+							codePager.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, totalHeight));
+							console.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0));
+						}
+						
+						
+						if (errorMessage) {
+							buffer.setBackgroundDrawable(getResources().getDrawable(R.drawable.back_error));
+							buffer.setBackgroundColor(getResources().getColor(R.color.error_back));
+							messageArea.setTextColor(getResources().getColor(R.color.error_text));
+						} else {
+							buffer.setBackgroundDrawable(getResources().getDrawable(R.drawable.back));
+							buffer.setBackgroundColor(getResources().getColor(R.color.message_back));
+							messageArea.setTextColor(getResources().getColor(R.color.message_text));
+						}
+						
+						CodeEditText codeArea = getSelectedCodeArea();
+						
+						if (codeArea != null) {
+							codeArea.updateBracketMatch();
+						}
+						
+						
+						if (PreferenceManager.getDefaultSharedPreferences(getApplicationContext()).getBoolean("char_inserts", true)) {
+							
+							toggleCharInserts.setVisibility(View.VISIBLE);
+							findViewById(R.id.toggle_char_inserts_separator).setVisibility(View.VISIBLE);
+							
+							if (charInserts) {
+								findViewById(R.id.message).setVisibility(View.GONE);
+								findViewById(R.id.char_insert_tray).setVisibility(View.VISIBLE);
+							}
+						}
+					}
+				} else {
+					if (keyboardVisible) {
+						
+						
+						View codeArea = getSelectedCodeAreaScroller();
+						View consoleArea = findViewById(R.id.console_scroller);
+						
+						ViewGroup content = (ViewGroup) findViewById(R.id.content);
+						
+						int totalHeight = content.getHeight() - message - (extraHeaderView != null ? extraHeaderView.getHeight() : 0);
+						
+						codePager.startAnimation(new ResizeAnimation<LinearLayout>(codePager, ResizeAnimation.DEFAULT, ResizeAnimation.DEFAULT, ResizeAnimation.DEFAULT, oldCodeHeight, false));
+						consoleArea.startAnimation(new ResizeAnimation<LinearLayout>(consoleArea, ResizeAnimation.DEFAULT, codeArea.getHeight(), ResizeAnimation.DEFAULT, totalHeight - oldCodeHeight, false));
+						
+						keyboardVisible = false;
+						
+						if (oldCodeHeight > 0) {
+							consoleWasHidden = false;
+						}
+						
+						
+						getSelectedCodeArea().clearFocus();
+						getSelectedCodeArea().matchingBracket = -1;
+						
+						
+						toggleCharInserts.setVisibility(View.GONE);
+						findViewById(R.id.toggle_char_inserts_separator).setVisibility(View.GONE);
+						
+						findViewById(R.id.message).setVisibility(View.VISIBLE);
+						findViewById(R.id.char_insert_tray).setVisibility(View.GONE);
+					}
+				}
+			}
+		});
+		
+		
+		toggleCharInserts = (ImageButton) findViewById(R.id.toggle_char_inserts);
+		toggleCharInserts.setOnClickListener(new OnClickListener() {
+			@Override
+			public void onClick(View view) {
+				toggleCharInserts();
+			}
+		});
+        
+        
+        
+        
+        keyBindings = new HashMap<String, KeyBinding>();
+        
+        try {
+        	
+			loadKeyBindings(new XML(getResources().getAssets().open("default_key_bindings.xml")));
+		} catch (IOException e) { 
+			e.printStackTrace();
+		} catch (ParserConfigurationException e) {
+			e.printStackTrace();
+		} catch (SAXException e) {
+			e.printStackTrace();
+		}
+        
+        
+        toggleCharInserts = (ImageButton) findViewById(R.id.toggle_char_inserts);
+		
+		
+		
+		if (justUpdated && PreferenceManager.getDefaultSharedPreferences(this).getBoolean("pref_whats_new_enable", true)) {
+			final Stack<String> releaseNotesStack = getReleaseNotesStack(this);
+			
+			AlertDialog.Builder builder = new AlertDialog.Builder(this);
+			builder.setTitle(R.string.whats_new);
+			
+			final RelativeLayout layout;
+			
+			layout = (RelativeLayout) View.inflate(new ContextThemeWrapper(this, R.style.Theme_AppCompat_Dialog), R.layout.whats_new, null);
+			
+			final ListView list = (ListView) layout.findViewById(R.id.whats_new_list);
+			final Button loadMore = (Button) layout.findViewById(R.id.whats_new_more);
+			final CheckBox keepShowing = (CheckBox) layout.findViewById(R.id.whats_new_keep_showing);
+			
+			final ArrayAdapter<String> listAdapter = new ArrayAdapter<String>(this, R.layout.whats_new_list_item, R.id.whats_new_list_item_text);
+			list.setAdapter(listAdapter);
+			
+			addWhatsNewItem(list, listAdapter, releaseNotesStack, loadMore, false);
+			
+			loadMore.setOnClickListener(new OnClickListener() {
+				@Override
+				public void onClick(View v) {
+					
+					for (int i = 0; i < 5; i++) {
+						
+						if (!addWhatsNewItem(list, listAdapter, releaseNotesStack, loadMore, true)) {
+							break;
+						}
+					}
+					
+					
+					int w = FrameLayout.LayoutParams.MATCH_PARENT;
+					int h = FrameLayout.LayoutParams.WRAP_CONTENT;
+							
+					layout.setLayoutParams(new FrameLayout.LayoutParams(w, h));
+				}
+			});
+			
+			builder.setView(layout);
+			builder.setNeutralButton(R.string.ok, new DialogInterface.OnClickListener() {
+				@Override
+				public void onClick(DialogInterface dialog, int which) {
+				}
+			});
+			
+			AlertDialog dialog = builder.create();
+			dialog.show();
+			
+			dialog.setOnDismissListener(new DialogInterface.OnDismissListener() {
+				@Override
+				public void onDismiss(DialogInterface dialog) {
+					
+					SharedPreferences.Editor edit = PreferenceManager.getDefaultSharedPreferences(EditorActivity.this).edit();
+					edit.putBoolean("pref_whats_new_enable", keepShowing.isChecked());
+					edit.apply();
+					
+					
+					
+					
+					getGlobalState().initExamplesRepo();
+				}
+			});
+			
+			layout.requestLayout();
+			
+			layout.post(new Runnable() {
+				@Override
+				public void run() {
+					
+					
+					int w = FrameLayout.LayoutParams.MATCH_PARENT;
+					int h = list.getChildAt(0).getHeight()
+							+ loadMore.getHeight() + keepShowing.getHeight()
+							+ Math.round(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 24, getResources().getDisplayMetrics()));
+					
+					layout.setLayoutParams(new FrameLayout.LayoutParams(w, h));
+				}
+			});
+		} else {
+			
+			
+			
+			getGlobalState().initExamplesRepo();
+		}
+		
+		codePagerAdapter.notifyDataSetChanged();
+		codeTabStrip.setupWithViewPager(codePager);
+	
+		
+		if (!loadSketchStart()) {
+			getGlobalState().selectNewTempSketch();
+			addDefaultTab(APDE.DEFAULT_SKETCH_TAB);
+			autoSave();
+		}
+    }
+	
+	@Override
+	public void onStart() {
+		super.onStart();
+		
+		APDE.StorageDrive.StorageDriveType storageDriveType = getGlobalState().getSketchbookStorageDrive().type;
+		
+		if (storageDriveType.equals(APDE.StorageDrive.StorageDriveType.PRIMARY_EXTERNAL) || storageDriveType.equals(APDE.StorageDrive.StorageDriveType.EXTERNAL)) {
+			
+			if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+				
+				
+				ActivityCompat.requestPermissions(this, new String[] {android.Manifest.permission.WRITE_EXTERNAL_STORAGE}, PERMISSIONS_REQUEST_CODE);
+			}
+		}
+	}
+	
+	protected final int PERMISSIONS_REQUEST_CODE = 42;
+	
+	@Override
+	public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
+		switch (requestCode) {
+		case PERMISSIONS_REQUEST_CODE:
+			if (grantResults.length == 0 || grantResults[0] != PackageManager.PERMISSION_GRANTED) {
+				
+			}
+			break;
+		}
+	}
+	
+	public int getSelectedCodeIndex() {
+		return codePager.getCurrentItem();
+	}
+	
+	public void selectCode(int index) {
+		codePager.setCurrentItem(index);
+	}
+	
+	public int getCodeCount() {
+		return tabs.size();
+	}
+	
+	public boolean isSelectedCodeAreaInitialized() {
+		return getSelectedSketchFile() != null && getSelectedSketchFile().getFragment().getCodeEditText() != null;
+	}
+	
+	public CodeEditText getSelectedCodeArea() {
+		return getSelectedSketchFile() != null ? getSelectedSketchFile().getFragment().getCodeEditText() : null;
+	}
+	
+	public ScrollView getSelectedCodeAreaScroller() {
+		return getSelectedSketchFile() != null ? getSelectedSketchFile().getFragment().getCodeScroller() : null;
+	}
+	
+	public SketchFile getSelectedSketchFile() {
+		return tabs.size() > 0 ? tabs.get(getSelectedCodeIndex()) : null;
+	}
+	
+	
+	protected static boolean addWhatsNewItem(ListView list, ArrayAdapter<String> adapter, Stack<String> items, Button more, boolean fullScroll) {
+		
+		if (items.empty()) {
+			more.setVisibility(View.GONE);
+			return false;
+		}
+		
+		
+		adapter.add(items.pop());
+		
+		if (fullScroll) {
+			
+			list.smoothScrollToPosition(adapter.getCount());
+		}
+		
+		
+		if (items.empty()) {
+			more.setVisibility(View.GONE);
+			return false;
+		} else {
+			more.setVisibility(View.VISIBLE);
+			return true;
+		}
+	}
+	
+	protected static Stack<String> getReleaseNotesStack(Context context) {
+		String fullText = APDE.readAssetFile(context, "whatsnew.txt");
+		
+		List<String> releaseNotes = Arrays.asList(
+		fullText.split("(\\r\\n|\\n|\\r)------------------------------------------------------------------------(\\r\\n|\\n|\\r)"));
+		
+		for (int i = 0; i < releaseNotes.size(); i ++) {
+			releaseNotes.set(i, releaseNotes.get(i).trim());
+		}
+		
+		
+		Collections.reverse(releaseNotes);
+		
+		final Stack<String> releaseNotesStack = new Stack<String>();
+		releaseNotesStack.addAll(releaseNotes);
+		
+		return releaseNotesStack;
+	}
+	
+	public TabLayout getCodeTabStrip() {
+		return codeTabStrip;
+	}
+	
+	public ViewPager getCodePager() {
+		return codePager;
+	}
+	
+	public ScrollView getConsoleScroller() {
+		return (ScrollView) findViewById(R.id.console_scroller);
+	}
+	
+	public void setExtraHeaderView(View headerView) {
+		extraHeaderView = headerView;
+	}
+	
+	public View getExtraHeaderView() {
+		return extraHeaderView;
+	}
+    
+    @Override
+    protected void onSaveInstanceState(Bundle icicle) {
+    	
+    	icicle.putInt("selected_tab", getSelectedCodeIndex());
+    	
+    	SketchFile[] tabMetas = new SketchFile[tabs.size()];
+
+    	
+
+
+
+
+
+
+
+
+
+		
+		for (int i = 0; i < tabs.size(); i ++) {
+			SketchFile sketchFile = tabs.get(i);
+			sketchFile.tabNum = i;
+			tabMetas[i] = sketchFile;
+		}
+    	
+    	
+    	icicle.putParcelableArray("tabs", getTabMetas());
+    }
+    
+    @Override
+    protected void onRestoreInstanceState(Bundle icicle) {
+    	if (icicle != null) {
+    		
+    		selectCode(icicle.getInt("selected_tab"));
+    		
+    		
+    		
+
+			
+			Parcelable[] tabMetaParcels = icicle.getParcelableArray("tabs");
+			
+			
+			loadTabs:
+			if (tabMetaParcels instanceof SketchFile[]) {
+				SketchFile[] tabMetas = (SketchFile[]) tabMetaParcels;
+				
+				if (tabs.size() > 0 && tabMetas[0].equals(tabs.get(0))) {
+					break loadTabs;
+				}
+				
+				for (SketchFile tabMeta : tabMetas) {
+
+					addTab(tabMeta);
+				}
+			} else {
+				System.err.println("Error occurred restoring state, likely caused by\na crash in an activity further down the hierarchy");
+			}
+    	}
+    }
+    
+    private static SparseArray<ActivityResultCallback> activityResultCodes = new SparseArray<ActivityResultCallback>();
+    
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+    	
+    	if (requestCode == FLAG_DELETE_APK) {
+    		Build.cleanUpPostLaunch(this);
+    	}
+    	
+    	ActivityResultCallback action = activityResultCodes.get(requestCode);
+    	
+    	if (action != null) {
+    		action.onActivityResult(requestCode, resultCode, data);
+    		
+    		activityResultCodes.remove(requestCode);
+    	}
+    }
+    
+    public void selectFile(int titleResId, int requestCode, ActivityResultCallback callback) {
+    	selectFile(getResources().getString(titleResId), requestCode, callback);
+    }
+    
+    public void selectFile(String title, int requestCode, ActivityResultCallback callback) {
+    	activityResultCodes.put(requestCode, callback);
+    	
+    	Intent intent = Intent.createChooser(FileUtils.createGetContentIntent(), title);
+	    startActivityForResult(intent, requestCode);
+    }
+    
+    public interface ActivityResultCallback {
+    	void onActivityResult(int requestCode, int resultCode, Intent data);
+    }
+    
+    @SuppressWarnings("deprecation")
+	@SuppressLint("NewApi")
+	public void onResume() {
+    	super.onResume();
+		
+    	
+
+		((TextView) findViewById(R.id.console)).setTextSize(Integer.parseInt(PreferenceManager.getDefaultSharedPreferences(this).getString("textsize_console", "14")));
+    	
+    	
+        if(PreferenceManager.getDefaultSharedPreferences(getApplicationContext()).getBoolean("use_hardware_keyboard", false))
+        	getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
+        else
+        	getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN);
+        
+        
+
+        
+		
+        final View charInsertToggle = findViewById(R.id.toggle_char_inserts);
+        charInsertToggle.setPadding(0, 0, 0, 0);
+        charInsertToggle.requestLayout();
+        charInsertToggle.post(new Runnable() {
+        	public void run() {
+        		charInsertToggle.setLayoutParams(new LinearLayout.LayoutParams(charInsertToggle.getHeight(), charInsertToggle.getHeight()));
+        		
+        		
+                charInsertToggle.setVisibility(View.GONE);
+        	}
+        });
+        
+        
+        
+        int minWidth;
+		int maxWidth;
+		
+		Point point = new Point();
+		getWindowManager().getDefaultDisplay().getSize(point);
+		maxWidth = point.x;
+		
+		
+		minWidth = maxWidth - (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 10, getResources().getDisplayMetrics()) * 2;
+		
+		
+
+		findViewById(R.id.console).setMinimumWidth(minWidth);
+		
+
+
+		
+		
+		
+		Intent intent = getIntent();
+        
+        if(intent.getAction().equals(Intent.ACTION_VIEW) && intent.getType() != null) {
+        	String scheme = intent.getData().getScheme();
+        	String filePath = intent.getData().getPath();
+        	
+        	
+        	if(scheme != null && scheme.equalsIgnoreCase("file") && filePath != null) {
+        		
+        		File file = new File(filePath);
+        		
+        		String ext = "";
+        		int lastDot = filePath.lastIndexOf('.');
+    			if(lastDot != -1) {
+    				ext = filePath.substring(lastDot);
+    			}
+    			
+        		
+        		if(file.exists() && !file.isDirectory() && ext.equalsIgnoreCase(".pde")) {
+        			
+        			File sketchFolder = file.getParentFile();
+        			
+        			
+        			loadSketch(sketchFolder.getAbsolutePath(), APDE.SketchLocation.EXTERNAL);
+        			
+        			message("Loaded external sketch.");
+        		}
+        	}
+        }
+        
+        
+        getGlobalState().initProcessingPrefs();
+        
+        
+        registerReceiver(consoleBroadcastReceiver, new IntentFilter("com.calsignlabs.apde.LogBroadcast"));
+        
+        
+        supportInvalidateOptionsMenu();
+	}
+    
+    public HashMap<String, KeyBinding> getKeyBindings() {
+    	return keyBindings;
+    }
+    
+    
+    public void loadKeyBindings(XML xml) {
+    	XML[] bindings = xml.getChildren();
+    	for(XML binding : bindings) {
+    		
+    		if(!binding.getName().equals("binding"))
+    			continue;
+    		
+    		
+    		String name = binding.getContent();
+    		int key = binding.getInt("key");
+    		
+    		
+    		String modifiers = binding.getString("mod");
+    		String[] mods = modifiers.split("\\|"); 
+    		
+    		
+    		boolean ctrl = false;
+    		boolean meta = false;
+    		boolean func = false;
+    		
+    		
+    		boolean alt = false;
+    		boolean sym = false;
+    		boolean shift = false;
+    		
+    		
+    		for(String mod : mods) {
+    			if(mod.equals("ctrl")) ctrl = true;
+    			if(mod.equals("meta")) meta = true;
+    			if(mod.equals("func")) func = true;
+    			
+    			if(mod.equals("alt")) alt = true;
+    			if(mod.equals("sym")) sym = true;
+    			if(mod.equals("shift")) shift = true;
+    		}
+    		
+    		
+    		KeyBinding bind = new KeyBinding(name, key, ctrl, meta, func, alt, sym, shift);
+    		
+    		
+    		keyBindings.put(name, bind);
+    	}
+    }
+    
+    @SuppressLint("NewApi")
+	@Override
+    public boolean onKeyDown(int key, KeyEvent event) {
+    	
+    	
+    	
+    	
+    	
+    	
+    	
+    	
+    	
+    	
+    	
+    	
+    	
+    	boolean ctrl = event.isCtrlPressed();
+		boolean meta = event.isMetaPressed();
+		boolean func = event.isFunctionPressed();
+		
+		boolean alt = event.isAltPressed();
+    	boolean sym = event.isSymPressed();
+    	boolean shift = event.isShiftPressed();
+    	
+    	
+    	
+    	
+    	if(keyBindings.get("save_sketch").matches(key, ctrl, meta, func, alt, sym, shift)) {
+    		saveSketch();
+    		return true;
+    	}
+    	if(keyBindings.get("new_sketch").matches(key, ctrl, meta, func, alt, sym, shift)) {
+    		createNewSketch();
+    		return true;
+    	}
+    	if(keyBindings.get("open_sketch").matches(key, ctrl, meta, func, alt, sym, shift)) {
+    		loadSketch();
+    		return true;
+    	}
+    	
+    	if(keyBindings.get("run_sketch").matches(key, ctrl, meta, func, alt, sym, shift)) {
+    		runApplication();
+    		return true;
+    	}
+    	if(keyBindings.get("stop_sketch").matches(key, ctrl, meta, func, alt, sym, shift)) {
+    		stopApplication();
+    		return true;
+    	}
+    	
+    	if(keyBindings.get("new_tab").matches(key, ctrl, meta, func, alt, sym, shift)) {
+    		if(!getGlobalState().isExample())
+    			addTabWithDialog();
+    		return true;
+    	}
+    	if(keyBindings.get("delete_tab").matches(key, ctrl, meta, func, alt, sym, shift)) {
+    		if(!getGlobalState().isExample())
+    			deleteTab();
+    		return true;
+    	}
+    	if(keyBindings.get("rename_tab").matches(key, ctrl, meta, func, alt, sym, shift)) {
+    		if(!getGlobalState().isExample())
+    			renameTab();
+    		return true;
+    	}
+    	
+    	if(keyBindings.get("undo").matches(key, ctrl, meta, func, alt, sym, shift)) {
+    		if (!getGlobalState().isExample() && getCodeCount() > 0 && PreferenceManager.getDefaultSharedPreferences(this).getBoolean("pref_key_undo_redo", true)) {
+    			tabs.get(getSelectedCodeIndex()).undo(this);
+    		}
+    		return true;
+    	}
+    	if(keyBindings.get("redo").matches(key, ctrl, meta, func, alt, sym, shift)) {
+    		if (!getGlobalState().isExample() && getCodeCount() > 0 && PreferenceManager.getDefaultSharedPreferences(this).getBoolean("pref_key_undo_redo", true)) {
+    			tabs.get(getSelectedCodeIndex()).redo(this);
+    		}
+    		
+    		return true;
+    	}
+    	
+    	
+    	
+    	
+    	KeyBinding press = new KeyBinding("press", key, ctrl, meta, func, alt, sym, shift);
+    	boolean toolShortcut = false;
+    	
+    	for(Tool tool : getGlobalState().getTools()) {
+    		KeyBinding toolBinding = tool.getKeyBinding();
+    		
+    		if(toolBinding != null && toolBinding.matches(press)) {
+    			tool.run();
+    			toolShortcut = true;
+    		}
+    	}
+    	
+    	if(toolShortcut) {
+    		return true;
+    	}
+    	
+		return super.onKeyDown(key, event);
+    }
+    
+    
+    public void createNewSketch() {
+		
+		autoSave();
+		
+		
+		getGlobalState().selectNewTempSketch();
+		
+		
+		newSketch();
+		
+		forceDrawerReload();
+		
+		
+		getSupportActionBar().setTitle(getGlobalState().getSketchName());
+    }
+	
+	
+	public void launchRenameSketch() {
+		AlertDialog.Builder alert = new AlertDialog.Builder(this);
+		
+		alert.setTitle(String.format(Locale.US, getResources().getString(R.string.rename_sketch_title), getGlobalState().getSketchName()));
+		alert.setMessage(R.string.rename_sketch_message);
+		
+		final EditText input = getGlobalState().createAlertDialogEditText(this, alert, getGlobalState().getSketchName(), true);
+		
+		alert.setPositiveButton(R.string.rename, new DialogInterface.OnClickListener() {
+			public void onClick(DialogInterface dialog, int whichButton) {
+				String sketchName = input.getText().toString();
+				
+				if (validateSketchName(sketchName) && !sketchName.equals(getGlobalState().getSketchName())) {
+					getGlobalState().setSketchName(sketchName);
+					
+					APDE.SketchMeta source = new APDE.SketchMeta(getGlobalState().getSketchLocationType(), getGlobalState().getSketchPath());
+					APDE.SketchMeta dest = new APDE.SketchMeta(source.getLocation(), source.getParent() + "/" + sketchName);
+					
+					getGlobalState().moveFolder(source, dest, EditorActivity.this);
+				}
+				
+				if (!PreferenceManager.getDefaultSharedPreferences(getApplicationContext()).getBoolean("use_hardware_keyboard", false)) {
+					((InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(input.getWindowToken(), 0);
+				}
+			}
+		});
+		
+		alert.setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
+			public void onClick(DialogInterface dialog, int whichButton) {
+				if (!PreferenceManager.getDefaultSharedPreferences(getApplicationContext()).getBoolean("use_hardware_keyboard", false)) {
+					((InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(input.getWindowToken(), 0);
+				}
+			}
+		});
+		
+		
+		AlertDialog dialog = alert.create();
+		if (!PreferenceManager.getDefaultSharedPreferences(getApplicationContext()).getBoolean("use_hardware_keyboard", false)) {
+			dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
+		}
+		dialog.show();
+	}
+    
+    
+    private void loadSketch() {
+    	
+    	
+		DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer);
+		RelativeLayout drawerLayout = (RelativeLayout) findViewById(R.id.drawer_wrapper);
+		
+		drawer.openDrawer(drawerLayout);
+	}
+    
+    public int getSketchCount() {
+    	
+    	File sketchbookLoc = getGlobalState().getSketchbookFolder();
+    	
+    	int count = 0;
+    	
+    	
+    	if(sketchbookLoc.exists()) {
+    		
+	    	File[] folders = sketchbookLoc.listFiles();
+	    	for(File folder : folders)
+	    		if(folder.isDirectory())
+	    			
+	    			count ++;
+    	}
+    	
+    	return count;
+    }
+    
+    protected int drawerIndexOfSketch(String name) {
+    	
+    	File sketchbookLoc = getGlobalState().getSketchbookFolder();
+    	
+    	int index = 1;
+    	
+    	
+    	if(sketchbookLoc.exists()) {
+    		
+	    	File[] folders = sketchbookLoc.listFiles();
+	    	
+	    	Arrays.sort(folders);
+	    	
+	    	for(File folder : folders) {
+	    		if(folder.isDirectory()) {
+	    			
+	    			if(folder.getName().equals(name))
+	    				return index;
+	    			
+	    			
+	    			index ++;
+	    		}
+	    	}
+    	}
+    	
+    	return -1;
+    }
+    
+	    // TODO
+
+    
+	private static boolean copyAsset(AssetManager assetManager, String fromAssetPath, String toPath) {
+		InputStream in = null;
+		OutputStream out = null;
+		try {
+			in = assetManager.open(fromAssetPath);
+			new File(toPath).createNewFile();
+			out = new FileOutputStream(toPath);
+			copyFile(in, out);
+			in.close();
+			in = null;
+			out.flush();
+			out.close();
+			out = null;
+
+			return true;
+		} catch(Exception e) {
+			e.printStackTrace();
+			return false;
+		}
+	}
+	
+	private static void copyFile(InputStream in, OutputStream out) throws IOException {
+		byte[] buffer = new byte[1024];
+		int read;
+		while((read = in.read(buffer)) != -1)
+			out.write(buffer, 0, read);
+	}
+	
+	@Override
+	public void onPause() {
+		
+		saveSketchForStop();
+		
+		
+		getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN);
+		
+		super.onPause();
+	}
+	
+	@Override
+	public void onStop() {
+		
+		saveSketchForStop();
+		
+		super.onStop();
+	}
+	
+	@Override
+	public void onDestroy() {
+		
+    	unregisterReceiver(consoleBroadcastReceiver);
+    	
+    	super.onDestroy();
+	}
+	
+	
+	public void saveSketchForStop() {
+		
+		autoSave();
+    	
+		
+		
+		
+		String sketchPath = getGlobalState().getSketchPath();
+		writeTempFile("sketchPath.txt", sketchPath);
+    	
+    	
+		String sketchLocation = getGlobalState().getSketchLocationType().toString();
+		writeTempFile("sketchLocation.txt", sketchLocation);
+	}
+	
+	
+	public boolean loadSketchStart() {
+		try {
+			
+			String sketchPath = readTempFile("sketchPath.txt");
+			APDE.SketchLocation sketchLocation = APDE.SketchLocation.fromString(readTempFile("sketchLocation.txt"));
+			
+			return loadSketch(sketchPath, sketchLocation);
+		} catch(Exception e) { 
+			return false;
+		}
+	}
+	
+	
+	public void reloadSketch() {
+		loadSketch(getGlobalState().getSketchPath(), getGlobalState().getSketchLocationType());
+	}
+	
+	
+	public void autoSave() {
+		switch(getGlobalState().getSketchLocationType()) {
+		case EXAMPLE:
+		case LIBRARY_EXAMPLE:
+			
+			break;
+		case SKETCHBOOK:
+		case EXTERNAL:
+		case TEMPORARY:
+			saveSketch();
+			break;
+		}
+	}
+	
+	
+	public void newSketch() {
+		
+		getSupportActionBar().setTitle(getGlobalState().getSketchName());
+		
+		supportInvalidateOptionsMenu();
+		
+		
+
+		tabs.clear();
+		codePagerAdapter.notifyDataSetChanged();
+		
+		
+		addDefaultTab(APDE.DEFAULT_SKETCH_TAB);
+		
+		
+		selectCode(0);
+		
+		
+
+
+		
+		
+		getSelectedSketchFile().clearUndoRedo();
+		
+		
+
+
+
+
+
+		
+		
+		autoSave();
+		
+		getGlobalState().putRecentSketch(getGlobalState().getSketchLocationType(), getGlobalState().getSketchPath());
+		
+		
+		forceDrawerReload();
+	}
+    
+	
+	public boolean loadSketch(String sketchPath, APDE.SketchLocation sketchLocation) {
+		if (sketchLocation == null) {
+			
+			return false;
+		}
+		
+		
+    	File sketchLoc = getGlobalState().getSketchLocation(sketchPath, sketchLocation);
+    	boolean success;
+    	
+    	
+    	if (sketchLoc.exists() && sketchLoc.isDirectory()) {
+    		getGlobalState().selectSketch(sketchPath, sketchLocation);
+    		
+    		
+    		File[] files = sketchLoc.listFiles();
+    		
+    		
+    		for (SketchFile meta : tabs) {
+				meta.disable();
+			}
+    		
+    		
+    		tabs.clear();
+
+    		
+			
+    		
+    		for (File file : files) {
+    			
+    			String[] folders = file.getPath().split("/");
+    			String[] parts = folders[folders.length - 1].split("\\.");
+    			
+    			if(parts.length != 2)
+    				continue;
+    			
+    			
+    			String prefix = parts[parts.length - 2];
+    			String suffix = parts[parts.length - 1];
+    			
+    			
+    			if (suffix.equals("pde")) {
+    				
+    				SketchFile meta = new SketchFile("");
+    				meta.readData(file.getAbsolutePath());
+    				meta.setTitle(prefix);
+					meta.setExample(getGlobalState().isExample());
+					
+					
+					addTabWithoutPagerUpdate(meta);
+					
+					meta.getFragment().setSketchFile(meta);
+    			} else if (suffix.equals("java")) {
+    				
+    				SketchFile meta = new SketchFile("");
+    				meta.readData(file.getAbsolutePath());
+    				meta.setTitle(prefix);
+    				meta.setSuffix(".java");
+					meta.setExample(getGlobalState().isExample());
+				
+					
+					addTabWithoutPagerUpdate(meta);
+				
+					meta.getFragment().setSketchFile(meta);
+    			}
+    		}
+		
+			codePagerAdapter.notifyDataSetChanged();
+    		
+
+
+
+
+
+    		
+			
+    		
+
+    		
+    		success = true;
+    		
+    		
+
+			selectCode(0);
+    	} else {
+    		success = false;
+    	}
+    	
+    	if(success) {
+			
+			((FindReplace) getGlobalState().getPackageToToolTable().get(FindReplace.PACKAGE_NAME)).close();
+			
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    		
+    		
+    		getGlobalState().putRecentSketch(sketchLocation, sketchPath);
+    	}
+    	
+    	return success;
+	}
+    
+    
+    public void saveSketch() {
+    	
+    	if(!externalStorageWritable() && (getGlobalState().getSketchbookDrive().type.equals(APDE.StorageDrive.StorageDriveType.EXTERNAL)
+				|| getGlobalState().getSketchbookDrive().type.equals(APDE.StorageDrive.StorageDriveType.PRIMARY_EXTERNAL))) {
+    		AlertDialog.Builder builder = new AlertDialog.Builder(this);
+            builder.setTitle(getResources().getText(R.string.external_storage_dialog_title))
+            	.setMessage(getResources().getText(R.string.external_storage_dialog_message)).setCancelable(false)
+            	.setPositiveButton(R.string.ok, new DialogInterface.OnClickListener() {
+            		@Override
+            		public void onClick(DialogInterface dialog, int which) {}
+            }).show();
+            
+    		return;
+    	}
+    	
+    	boolean success = true;
+    	
+    	String sketchPath = getGlobalState().getSketchPath();
+    	
+    	
+    	File sketchLoc = getGlobalState().getSketchLocation(sketchPath, getGlobalState().getSketchLocationType());
+    	
+    	
+    	sketchLoc.mkdirs();
+    	
+    	if (getCodeCount() > 0) {
+
+
+
+	    	
+			
+			for (int i = 0; i < tabs.size(); i ++) {
+				
+				if (tabs.get(i).getFragment().getCodeEditText() != null) {
+					tabs.get(i).update(this, getGlobalState().getPref("pref_key_undo_redo", true));
+				}
+			}
+			
+	    	
+	    	for(SketchFile meta : tabs) {
+	    		if (meta.enabled()) {
+	    			
+	    			if (!meta.writeData(sketchLoc.getPath() + "/")) {
+	    				success = false;
+	    			}
+	    		}
+	    	}
+	    	
+	    	if (success) {
+	    		getGlobalState().selectSketch(sketchPath, getGlobalState().getSketchLocationType());
+	    		
+	    		
+	    		forceDrawerReload();
+	    		
+	    		supportInvalidateOptionsMenu();
+	            
+	            
+	    		message(getResources().getText(R.string.sketch_saved));
+	    		setSaved(true);
+	    	} else {
+	    		
+	    		error(getResources().getText(R.string.sketch_save_failure));
+	    	}
+    	} else {
+    		
+    		
+    		
+    		
+    		forceDrawerReload();
+    		
+            
+    		message(getResources().getText(R.string.sketch_saved));
+    		setSaved(true);
+    	}
+    }
+    
+    public void copyToSketchbook() {
+    	
+		if(!externalStorageWritable() && (getGlobalState().getSketchbookDrive().type.equals(APDE.StorageDrive.StorageDriveType.EXTERNAL)
+				|| getGlobalState().getSketchbookDrive().type.equals(APDE.StorageDrive.StorageDriveType.PRIMARY_EXTERNAL))) {
+    		AlertDialog.Builder builder = new AlertDialog.Builder(this);
+            builder.setTitle(getResources().getText(R.string.external_storage_dialog_title))
+            	.setMessage(getResources().getText(R.string.external_storage_dialog_message)).setCancelable(false)
+            	.setPositiveButton(R.string.ok, new DialogInterface.OnClickListener() {
+            		@Override
+            		public void onClick(DialogInterface dialog, int which) {}
+            }).show();
+            
+    		return;
+    	}
+    	
+    	
+    	File oldLoc = getGlobalState().getSketchLocation();
+    	
+    	
+    	String sketchPath = "/" + getGlobalState().getSketchName();
+    	
+    	
+    	
+    	File sketchLoc = getGlobalState().getSketchLocation(sketchPath, APDE.SketchLocation.SKETCHBOOK);
+    	
+    	
+    	sketchLoc.mkdirs();
+    	
+    	try {
+    		APDE.copyFile(oldLoc, sketchLoc);
+    		
+    		
+    		getGlobalState().putRecentSketch(APDE.SketchLocation.SKETCHBOOK, sketchPath);
+    		
+    		getGlobalState().selectSketch(sketchPath, APDE.SketchLocation.SKETCHBOOK);
+    		
+    		
+
+
+    		
+    		
+    		forceDrawerReload();
+    		
+    		supportInvalidateOptionsMenu();
+			
+			updateCodeAreaFocusable();
+            
+            
+    		message(getResources().getText(R.string.sketch_saved));
+    		setSaved(true);
+    	} catch (IOException e) {
+    		
+    		error(getResources().getText(R.string.sketch_save_failure));
+    	}
+    }
+	
+	public void updateCodeAreaFocusable() {
+		for (SketchFile sketchFile : tabs) {
+			sketchFile.setExample(false);
+			sketchFile.forceReloadTextIfInitialized();
+		}
+	}
+	
+	public void moveToSketchbook() {
+		AlertDialog.Builder builder = new AlertDialog.Builder(this);
+		
+		builder.setTitle(R.string.move_temp_to_sketchbook_title);
+		builder.setMessage(String.format(Locale.US, getResources().getString(R.string.move_temp_to_sketchbook_message), getGlobalState().getSketchName()));
+		
+		builder.setPositiveButton(R.string.move, new DialogInterface.OnClickListener() {
+			@Override
+			public void onClick(DialogInterface dialog, int which) {
+				APDE.SketchMeta source = new APDE.SketchMeta(getGlobalState().getSketchLocationType(), getGlobalState().getSketchPath());
+				APDE.SketchMeta dest = new APDE.SketchMeta(APDE.SketchLocation.SKETCHBOOK, "/" + source.getName());
+				
+				
+				
+				
+				if (getGlobalState().getSketchLocation(dest.getPath(), dest.getLocation()).exists()) {
+					AlertDialog.Builder builder = new AlertDialog.Builder(EditorActivity.this);
+					
+					builder.setTitle(R.string.cannot_move_sketch_title);
+					builder.setMessage(R.string.cannot_move_folder_message);
+					
+					builder.setPositiveButton(getResources().getString(R.string.ok), new DialogInterface.OnClickListener() {
+						@Override
+						public void onClick(DialogInterface dialog, int which) {}
+					});
+					
+					builder.create().show();
+					
+					return;
+				}
+				
+				getGlobalState().moveFolder(source, dest, EditorActivity.this);
+				supportInvalidateOptionsMenu();
+			}
+		});
+		
+		builder.setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
+			public void onClick(DialogInterface dialog, int whichButton) {}
+		});
+		
+		builder.create().show();
+	}
+    
+    
+  	public void copyPrefs(String before, String after) {
+  		SharedPreferences old = getSharedPreferences(getGlobalState().getSketchName(), 0);
+  		SharedPreferences prefs = getSharedPreferences(after, 0);
+  		SharedPreferences.Editor ed = prefs.edit();
+  		
+  		for(Entry<String,?> entry : old.getAll().entrySet()){ 
+  			Object v = entry.getValue(); 
+  			String key = entry.getKey();
+
+  			if(v instanceof Boolean)
+  				ed.putBoolean(key, ((Boolean) v).booleanValue());
+  			else if(v instanceof Float)
+  				ed.putFloat(key, ((Float) v).floatValue());
+  			else if(v instanceof Integer)
+  				ed.putInt(key, ((Integer) v).intValue());
+  			else if(v instanceof Long)
+  				ed.putLong(key, ((Long) v).longValue());
+  			else if(v instanceof String)
+  				ed.putString(key, ((String) v));         
+  		}
+  		
+  		ed.commit();
+  		old.edit().clear().commit();
+  	}
+    
+    private boolean validateSketchName(String name) {
+    	
+		if(name.length() <= 0) {
+			error(getResources().getText(R.string.sketch_name_invalid_no_char));
+			return false;
+		}
+		
+		
+		char first = name.charAt(0);
+		if((first >= '0' && first <= '9') || first == '_') {
+			error(getResources().getText(R.string.sketch_name_invalid_first_char));
+			return false;
+		}
+		
+		
+		for(int i = 0; i < name.length(); i ++) {
+			char c = name.charAt(i);
+			if(c >= '0' && c <= '9') continue;
+			if(c >= 'a' && c <= 'z') continue;
+			if(c >= 'A' && c <= 'Z') continue;
+			if(c == '_') continue;
+			
+			error(getResources().getText(R.string.sketch_name_invalid_char));
+			return false;
+		}
+		
+		return true;
+	}
+	
+	public void launchDeleteSketchConfirmationDialog() {
+		AlertDialog.Builder alert = new AlertDialog.Builder(this);
+		
+		alert.setTitle(String.format(Locale.US, getResources().getString(R.string.delete_sketch_dialog_title), getGlobalState().getSketchName()));
+		alert.setMessage(String.format(Locale.US, getResources().getString(R.string.delete_sketch_dialog_message), getGlobalState().getSketchName()));
+		
+		alert.setPositiveButton(R.string.delete, new DialogInterface.OnClickListener() {
+			@SuppressLint("NewApi")
+			public void onClick(DialogInterface dialog, int whichButton) {
+				deleteSketch();
+				
+				getGlobalState().selectNewTempSketch();
+				newSketch();
+				
+				toolbar.setTitle(getGlobalState().getSketchName());
+			}
+		});
+		
+		alert.setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
+			public void onClick(DialogInterface dialog, int whichButton) {}
+		});
+		
+		alert.create().show();
+	}
+    
+    
+    public void deleteSketch() {
+    	
+    	File sketchFolder = getGlobalState().getSketchLocation();
+    	if(sketchFolder.isDirectory()) {
+    		try {
+    			
+				APDE.deleteFile(sketchFolder);
+			} catch (IOException e) {
+				
+				e.printStackTrace();
+			}
+    	}
+    }
+    
+    
+    public boolean writeTempFile(String filename, String text) {
+    	BufferedOutputStream outputStream = null;
+		boolean success;
+		
+		try {
+			
+			outputStream = new BufferedOutputStream(openFileOutput(filename, Context.MODE_PRIVATE));
+			
+			outputStream.write(text.getBytes());
+			
+			success = true;
+		} catch(Exception e) {
+			e.printStackTrace();
+			
+			success = false;
+			
+		} finally {
+			
+			if(outputStream != null) {
+				try {
+					outputStream.close();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+		}
+		
+		return success;
+    }
+    
+    
+    public String readTempFile(String filename) {
+    	BufferedInputStream inputStream = null;
+    	String output = "";
+    	
+		try {
+			
+			inputStream = new BufferedInputStream(openFileInput(filename));
+			
+			byte[] contents = new byte[1024];
+			int bytesRead = 0;
+			
+			
+			while((bytesRead = inputStream.read(contents)) != -1)
+				output += new String(contents, 0, bytesRead);
+		} catch(Exception e) {
+			
+		} finally {
+			
+			try {
+				if(inputStream != null)
+					inputStream.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+    	
+    	return output;
+    }
+    
+    
+    public void forceDrawerReload() {
+        final ListView drawerList = (ListView) findViewById(R.id.drawer_list);
+        
+        ArrayList<FileNavigatorAdapter.FileItem> items;
+        
+        if(drawerSketchLocationType != null) {
+        	items = getGlobalState().listSketchContainingFolders(getGlobalState().getSketchLocation(drawerSketchPath, drawerSketchLocationType), new String[] {APDE.LIBRARIES_FOLDER},
+        			drawerSketchPath.length() > 0, drawerSketchLocationType.equals(APDE.SketchLocation.SKETCHBOOK) || drawerSketchLocationType.equals(APDE.SketchLocation.TEMPORARY),
+					new APDE.SketchMeta(drawerSketchLocationType, drawerSketchPath));
+        } else {
+        	if(drawerRecentSketch) {
+        		items = getGlobalState().listRecentSketches();
+        	} else {
+        		items = new ArrayList<FileNavigatorAdapter.FileItem>();
+        		items.add(new FileNavigatorAdapter.FileItem(getResources().getString(R.string.sketches), FileNavigatorAdapter.FileItemType.FOLDER));
+        		items.add(new FileNavigatorAdapter.FileItem(getResources().getString(R.string.examples), FileNavigatorAdapter.FileItemType.FOLDER));
+        		items.add(new FileNavigatorAdapter.FileItem(getResources().getString(R.string.library_examples), FileNavigatorAdapter.FileItemType.FOLDER));
+				items.add(new FileNavigatorAdapter.FileItem(getResources().getString(R.string.temporary), FileNavigatorAdapter.FileItemType.FOLDER));
+        		items.add(new FileNavigatorAdapter.FileItem(getResources().getString(R.string.recent), FileNavigatorAdapter.FileItemType.FOLDER));
+        	}
+        }
+        
+        int selected = -1;
+		
+        if(drawerSketchLocationType != null && drawerSketchLocationType.equals(getGlobalState().getSketchLocationType())
+        		&& getGlobalState().getSketchPath().equals(drawerSketchPath + "/" + getGlobalState().getSketchName())) {
+        	
+        	selected = FileNavigatorAdapter.indexOfSketch(items, getGlobalState().getSketchName());
+        } else if(drawerRecentSketch && !(getGlobalState().getRecentSketches().size() == 0)) {
+        	
+        	
+        	selected = 1;
+        }
+        
+        final FileNavigatorAdapter fileAdapter = new FileNavigatorAdapter(this, items, selected);
+        
+        
+        drawerList.setAdapter(fileAdapter);
+        drawerList.setChoiceMode(ListView.CHOICE_MODE_SINGLE);
+        
+        
+        
+        drawerList.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
+			@Override
+			public boolean onItemLongClick(AdapterView<?> adapterView, View view, int position, long id) {
+				return fileAdapter.onLongClickItem(view, position);
+			}
+		});
+    }
+    
+    public void setDrawerLocation(APDE.SketchMeta folder) {
+    	drawerSketchLocationType = folder.getLocation();
+    	drawerSketchPath = folder.getPath();
+    	
+    	forceDrawerReload();
+    }
+    
+    
+    public APDE getGlobalState() {
+    	return (APDE) getApplication();
+    }
+    
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.activity_editor, menu);
+        
+        if(drawerOpen) {
+        	
+        	
+        	
+        	menu.findItem(R.id.menu_run).setVisible(false);
+        	menu.findItem(R.id.menu_stop).setVisible(false);
+        	menu.findItem(R.id.menu_undo).setVisible(false);
+        	menu.findItem(R.id.menu_redo).setVisible(false);
+        	menu.findItem(R.id.menu_tab_delete).setVisible(false);
+        	menu.findItem(R.id.menu_tab_rename).setVisible(false);
+        	menu.findItem(R.id.menu_save).setVisible(false);
+			menu.findItem(R.id.menu_delete).setVisible(false);
+			menu.findItem(R.id.menu_rename).setVisible(false);
+        	menu.findItem(R.id.menu_copy_to_sketchbook).setVisible(false);
+			menu.findItem(R.id.menu_move_to_sketchbook).setVisible(false);
+        	menu.findItem(R.id.menu_new).setVisible(false);
+        	menu.findItem(R.id.menu_load).setVisible(false);
+        	menu.findItem(R.id.menu_tab_new).setVisible(false);
+        	menu.findItem(R.id.menu_tools).setVisible(false);
+        	menu.findItem(R.id.menu_sketch_properties).setVisible(false);
+        	
+        	
+        	getSupportActionBar().setTitle(R.string.app_name);
+        } else {
+        	if (getCodeCount() > 0) {
+        		
+        		
+        		
+            	menu.findItem(R.id.menu_run).setVisible(true);
+            	menu.findItem(R.id.menu_stop).setVisible(true);
+            	menu.findItem(R.id.menu_tab_delete).setVisible(true);
+            	menu.findItem(R.id.menu_tab_rename).setVisible(true);
+            	
+            	menu.findItem(R.id.menu_tools).setVisible(true);
+            	
+            	if (getGlobalState().isExample()) {
+            		menu.findItem(R.id.menu_undo).setVisible(false);
+                	menu.findItem(R.id.menu_redo).setVisible(false);
+            	} else {
+            		if (PreferenceManager.getDefaultSharedPreferences(this).getBoolean("pref_key_undo_redo", true)) {
+            			menu.findItem(R.id.menu_undo).setVisible(true);
+            			menu.findItem(R.id.menu_redo).setVisible(true);
+            		} else {
+            			menu.findItem(R.id.menu_undo).setVisible(false);
+                    	menu.findItem(R.id.menu_redo).setVisible(false);
+            		}
+            	}
+            } else {
+            	
+            	
+            	
+            	menu.findItem(R.id.menu_run).setVisible(false);
+    	    	menu.findItem(R.id.menu_stop).setVisible(false);
+    	    	menu.findItem(R.id.menu_undo).setVisible(false);
+            	menu.findItem(R.id.menu_redo).setVisible(false);
+    	    	menu.findItem(R.id.menu_tab_delete).setVisible(false);
+            	menu.findItem(R.id.menu_tab_rename).setVisible(false);
+            	menu.findItem(R.id.menu_tools).setVisible(false);
+            }
+        	
+        	
+        	SketchFile meta = getSelectedSketchFile();
+        	menu.findItem(R.id.menu_undo).setEnabled(meta != null ? meta.canUndo() : false);
+        	menu.findItem(R.id.menu_redo).setEnabled(meta != null ? meta.canRedo() : false);
+        	
+        	
+        	
+        	switch (getGlobalState().getSketchLocationType()) {
+        	case SKETCHBOOK:
+				menu.findItem(R.id.menu_save).setVisible(true);
+				menu.findItem(R.id.menu_delete).setVisible(true);
+				menu.findItem(R.id.menu_rename).setVisible(true);
+				menu.findItem(R.id.menu_copy_to_sketchbook).setVisible(false);
+				menu.findItem(R.id.menu_move_to_sketchbook).setVisible(false);
+				break;
+        	case TEMPORARY:
+        		menu.findItem(R.id.menu_save).setVisible(true);
+				menu.findItem(R.id.menu_delete).setVisible(true);
+				menu.findItem(R.id.menu_rename).setVisible(false);
+        		menu.findItem(R.id.menu_copy_to_sketchbook).setVisible(false);
+				menu.findItem(R.id.menu_move_to_sketchbook).setVisible(true);
+        		break;
+        	case EXTERNAL:
+        		menu.findItem(R.id.menu_save).setVisible(true);
+				menu.findItem(R.id.menu_delete).setVisible(true);
+				menu.findItem(R.id.menu_rename).setVisible(true);
+        		menu.findItem(R.id.menu_copy_to_sketchbook).setVisible(true);
+				menu.findItem(R.id.menu_move_to_sketchbook).setVisible(false);
+        		break;
+        	case EXAMPLE:
+        	case LIBRARY_EXAMPLE:
+        		menu.findItem(R.id.menu_save).setVisible(false);
+				menu.findItem(R.id.menu_delete).setVisible(false);
+				menu.findItem(R.id.menu_rename).setVisible(false);
+        		menu.findItem(R.id.menu_copy_to_sketchbook).setVisible(true);
+				menu.findItem(R.id.menu_move_to_sketchbook).setVisible(false);
+        		break;
+        	}
+        	
+        	menu.findItem(R.id.menu_new).setVisible(true);
+        	menu.findItem(R.id.menu_load).setVisible(true);
+        	menu.findItem(R.id.menu_tab_new).setVisible(true);
+        	menu.findItem(R.id.menu_sketch_properties).setVisible(true);
+        	
+        	
+        	getSupportActionBar().setTitle(getGlobalState().getSketchName());
+        }
+        
+        
+        
+        menu.findItem(R.id.menu_tab_new).setVisible(false);
+        menu.findItem(R.id.menu_tab_delete).setVisible(false);
+    	menu.findItem(R.id.menu_tab_rename).setVisible(false);
+		
+		
+		
+		menu.findItem(R.id.menu_save).setVisible(false);
+    	
+    	
+    	if (getCodeCount() <= 0 && !getGlobalState().isExample()) {
+			menu.findItem(R.id.menu_tab_new).setVisible(true);
+		}
+    	
+        return true;
+    }
+    
+    @Override
+    protected void onPostCreate(Bundle savedInstanceState) {
+        super.onPostCreate(savedInstanceState);
+        drawerToggle.syncState(); 
+    }
+    
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        drawerToggle.onConfigurationChanged(newConfig); 
+    }
+    
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+    	
+    	
+        switch(item.getItemId()) {
+        	case android.R.id.home:
+        		
+        		
+        		
+        		DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer);
+        		RelativeLayout drawerLayout = (RelativeLayout) findViewById(R.id.drawer_wrapper);
+        		
+        		if(drawer.isDrawerOpen(drawerLayout)) {
+        			
+                    drawer.closeDrawer(drawerLayout);
+        		} else {
+        			
+                    drawer.openDrawer(drawerLayout);
+                    
+                    
+					if (isSelectedCodeAreaInitialized()) {
+						getSelectedCodeArea().setEnabled(false);
+					}
+                    supportInvalidateOptionsMenu();
+                }
+        		return true;
+            case R.id.menu_run:
+            	runApplication();
+            	return true;
+            case R.id.menu_stop:
+            	stopApplication();
+            	return true;
+            case R.id.menu_undo:
+        		tabs.get(getSelectedCodeIndex()).undo(this);
+            	return true;
+            case R.id.menu_redo:
+            	tabs.get(getSelectedCodeIndex()).redo(this);
+            	return true;
+            case R.id.menu_save:
+            	saveSketch();
+            	return true;
+			case R.id.menu_rename:
+				launchRenameSketch();
+				return true;
+            case R.id.menu_copy_to_sketchbook:
+            	copyToSketchbook();
+            	return true;
+			case R.id.menu_move_to_sketchbook:
+				moveToSketchbook();
+				return true;
+            case R.id.menu_new:
+            	createNewSketch();
+            	return true;
+            case R.id.menu_load:
+            	loadSketch();
+            	return true;
+			case R.id.menu_delete:
+				launchDeleteSketchConfirmationDialog();
+				return true;
+            case R.id.menu_settings:
+            	launchSettings();
+            	return true;
+            case R.id.menu_tab_new:
+            	addTabWithDialog();
+            	return true;
+            case R.id.menu_tab_rename:
+            	renameTab();
+            	return true;
+            case R.id.menu_tab_delete:
+            	deleteTab();
+            	return true;
+            case R.id.menu_tools:
+            	launchTools();
+        		return true;
+            case R.id.menu_sketch_properties:
+            	launchSketchProperties();
+            	return true;
+            default:
+                return super.onOptionsItemSelected(item);
+        }
+    }
+	
+    public void toggleCharInserts() {
+    	
+		if (!PreferenceManager.getDefaultSharedPreferences(getApplicationContext()).getBoolean("char_inserts", true)) {
+			return;
+		}
+    	
+    	if (!keyboardVisible) {
+			return;
+		}
+    	
+    	if (charInserts) {
+			hideCharInserts();
+    	} else {
+			
+			reloadCharInserts();
+		
+			showCharInserts();
+    	}
+    }
+    
+    protected void showCharInserts() {
+		TextView messageView = (TextView) findViewById(R.id.message);
+		HorizontalScrollView charInsertTray = (HorizontalScrollView) findViewById(R.id.char_insert_tray);
+		
+		View buffer = findViewById(R.id.buffer);
+		
+		View sep = findViewById(R.id.toggle_char_inserts_separator);
+		
+		toggleCharInserts.setImageResource(errorMessage ? R.drawable.ic_caret_right_white : R.drawable.ic_caret_right_black);
+
+
+		
+		int total = buffer.getWidth() - sep.getWidth() - toggleCharInserts.getWidth();
+		
+		RotateAnimation rotate = new RotateAnimation(180f, 360f, Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f);
+		rotate.setInterpolator(new AccelerateDecelerateInterpolator());
+		rotate.setRepeatCount(0);
+		rotate.setDuration(200);
+		
+		messageView.startAnimation(new ResizeAnimation<LinearLayout>(messageView, ResizeAnimation.DEFAULT, ResizeAnimation.DEFAULT, 0, ResizeAnimation.DEFAULT));
+		charInsertTray.startAnimation(new ResizeAnimation<LinearLayout>(charInsertTray, 0, buffer.getHeight(), total, buffer.getHeight()));
+		toggleCharInserts.startAnimation(rotate);
+		
+		charInserts = true;
+    }
+	
+    protected void hideCharInserts() {
+		if (!(keyboardVisible && charInserts)) {
+			
+			return;
+		}
+		
+		TextView messageView = (TextView) findViewById(R.id.message);
+		HorizontalScrollView charInsertTray = (HorizontalScrollView) findViewById(R.id.char_insert_tray);
+		
+		View buffer = findViewById(R.id.buffer);
+		
+		View sep = findViewById(R.id.toggle_char_inserts_separator);
+	
+		toggleCharInserts.setImageResource(errorMessage ? R.drawable.ic_caret_left_white : R.drawable.ic_caret_left_black);
+		
+		int total = buffer.getWidth() - sep.getWidth() - toggleCharInserts.getWidth();
+		
+		RotateAnimation rotate = new RotateAnimation(180f, 360f, Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f);
+		rotate.setInterpolator(new AccelerateDecelerateInterpolator());
+		rotate.setRepeatCount(0);
+		rotate.setDuration(200);
+		
+		messageView.startAnimation(new ResizeAnimation<LinearLayout>(messageView, 0, buffer.getHeight(), total, buffer.getHeight()));
+		charInsertTray.startAnimation(new ResizeAnimation<LinearLayout>(charInsertTray, ResizeAnimation.DEFAULT, ResizeAnimation.DEFAULT, 0, ResizeAnimation.DEFAULT));
+		toggleCharInserts.startAnimation(rotate);
+		
+		charInserts = false;
+    }
+	
+	public void hideCharInsertsNoAnimation() {
+		TextView messageView = (TextView) findViewById(R.id.message);
+		HorizontalScrollView charInsertTray = (HorizontalScrollView) findViewById(R.id.char_insert_tray);
+		
+		toggleCharInserts.setImageResource(errorMessage ? R.drawable.ic_caret_left_white : R.drawable.ic_caret_left_black);
+		messageView.setVisibility(View.VISIBLE);
+		charInsertTray.setVisibility(View.GONE);
+		
+		charInserts = false;
+	}
+    
+    
+	public void reloadCharInserts() {
+		if (!keyboardVisible)
+			return;
+		
+    	if (message == -1) {
+			message = findViewById(R.id.buffer).getHeight();
+		}
+    	
+    	
+    	LinearLayout container = ((LinearLayout) findViewById(R.id.char_insert_tray_list));
+    	
+    	container.removeAllViews();
+    	
+    	
+    	
+    	String[] chars;
+    	
+    	if(PreferenceManager.getDefaultSharedPreferences(getApplicationContext()).getBoolean("char_inserts_include_numbers", true))
+    		chars = new String[] {"\u2192", ";", ".", ",", "{", "}", "(", ")", "=", "*", "/", "+", "-", "&", "|", "!", "[", "]", "<", ">", "\"", "'", "\\", "_", "?", ":", "%", "@", "#", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0"};
+    	else
+    		chars = new String[] {"\u2192", ";", ".", ",", "{", "}", "(", ")", "=", "*", "/", "+", "-", "&", "|", "!", "[", "]", "<", ">", "\"", "'", "\\", "_", "?", ":", "%", "@", "#"};
+    	
+    	//This works for now... as far as I can tell
+    	final int keyboardID = 0;
+		
+    	//Add each button to the container
+    	for(final String c : chars) {
+    		Button button = (Button) LayoutInflater.from(this).inflate(R.layout.char_insert_button, null);
+    		button.setText(c);
+    		button.setTextColor(getResources().getColor(errorMessage ? R.color.char_insert_button_light : R.color.char_insert_button));
+    		button.setLayoutParams(new LinearLayout.LayoutParams((int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 25, getResources().getDisplayMetrics()), message));
+    		button.setPadding(0, 0, 0, 0);
+    		
+    		//Maybe we'll want these at some point in time... but for now, they just cause more problems...
+    		//...and the user won't be dragging the divider around if the keyboard is open (which it really should be)
+//    		//Still let the user drag the message area
+//    		button.setOnLongClickListener(messageListener);
+//    		button.setOnTouchListener(messageListener);
+    		
+    		container.addView(button);
+    		
+    		button.setOnClickListener(new OnClickListener() {
+				@Override
+				public void onClick(View view) {
+					// A special check for the tab key... making special exceptions aren't exactly ideal, but this is probably the most concise solution (for now)...
+					KeyEvent event = c.equals("\u2192") ? new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_TAB) : new KeyEvent(android.os.SystemClock.uptimeMillis(), c, keyboardID, 0);
+					
+					boolean dispatched = false;
+					
+					if (extraHeaderView != null) {
+						// If the find/replace toolbar is open
+						
+						EditText findTextField = (EditText) extraHeaderView.findViewById(R.id.find_replace_find_text);
+						EditText replaceTextField = (EditText) extraHeaderView.findViewById(R.id.find_replace_replace_text);
+						
+						if (findTextField != null) {
+							if (findTextField.hasFocus()) {
+								findTextField.dispatchKeyEvent(event);
+								dispatched = true;
+							} else {
+								if (replaceTextField != null && replaceTextField.hasFocus()) {
+									replaceTextField.dispatchKeyEvent(event);
+									dispatched = true;
+								}
+							}
+						}
+					}
+					
+					if (!dispatched) {
+						getSelectedCodeArea().dispatchKeyEvent(event);
+					}
+					
+					// Provide haptic feedback (if the user has vibrations enabled)
+					if(PreferenceManager.getDefaultSharedPreferences(getApplicationContext()).getBoolean("pref_vibrate", true))
+						((android.os.Vibrator) getSystemService(VIBRATOR_SERVICE)).vibrate(10); //10 millis
+				}
+    		});
+    	}
+    }
+    
+    /**
+     * Builds and launches the current sketch
+     * This CAN be called multiple times without breaking anything
+     */
+    private void runApplication() {
+    	switch(getGlobalState().getSketchLocationType()) {
+    	case EXAMPLE:
+    	case LIBRARY_EXAMPLE:
+    		break;
+    	case SKETCHBOOK:
+    	case EXTERNAL:
+		case TEMPORARY:
+    		saveSketch();
+    		break;
+    	}
+    	
+    	//In case the user presses the button twice, we don't want any errors
+    	if (building) {
+    		return;
+    	}
+		
+		if (!checkScreenOverlay()) {
+			return;
+		}
+    	
+    	//Clear the console
+    	((TextView) findViewById(R.id.console)).setText("");
+    	
+    	final Build builder = new Build(getGlobalState());
+    	
+    	//Build the sketch in a separate thread
+    	Thread buildThread = new Thread(new Runnable() {
+    		@Override
+    		public void run() {
+    			building = true;
+    			builder.build("debug");
+    			building = false;
+    	}});
+    	buildThread.start();
+    }
+    
+    /**
+     * Stops the current sketch's build process
+     * This CAN be called multiple times without breaking anything
+     */
+    private void stopApplication() {
+    	//This will stop the current build process
+    	//I don't think we can stop a running app...
+    	//...that's what the BACK button is for
+    	
+    	if(building)
+    		Build.halt();
+    }
+	
+	/**
+	 * Set to the most recent value of MotionEvent.FLAG_WINDOW_IS_OBSCURED
+	 * 
+	 * This will be true if a screen overlay (e.g. Twilight, Lux, or similar app) is currently
+	 * being drawn over the screen. Android security measures prevent app installation if a screen
+	 * overlay is being drawn, so we need to let the user know and stop the build so that we don't
+	 * get "I can't press the install button!" emails.
+	 * 
+	 * This is the exact same detection method used by the Android system, so there are no corner
+	 * cases. See the link below for the source code of Android's implementation:
+	 * 
+	 * http:
+	 */
+	private boolean isTouchObscured = false;
+	
+	@Override
+	public boolean dispatchTouchEvent(MotionEvent event) {
+		
+		
+		isTouchObscured = (event.getFlags() & MotionEvent.FLAG_WINDOW_IS_OBSCURED) != 0;
+		return super.dispatchTouchEvent(event);
+	}
+	
+	
+	public boolean checkScreenOverlay() {
+		if (isTouchObscured) {
+			AlertDialog.Builder builder = new AlertDialog.Builder(this);
+			
+			builder.setTitle(R.string.screen_overlay_dialog_title);
+			builder.setMessage(R.string.screen_overlay_dialog_message);
+			
+			builder.setPositiveButton(R.string.ok, new DialogInterface.OnClickListener() {
+				@Override
+				public void onClick(DialogInterface dialogInterface, int i) {}
+			});
+			
+			builder.setNeutralButton(R.string.info, new DialogInterface.OnClickListener() {
+				@Override
+				public void onClick(DialogInterface dialogInterface, int i) {
+					startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(getResources().getString(R.string.screen_overlay_info_wiki_url))));
+				}
+			});
+			
+			builder.show();
+			
+			return false;
+		} else {
+			return true;
+		}
+	}
+    
+    
+    public void message(String msg) {
+    	
+    	((TextView) findViewById(R.id.message)).setText(msg);
+    	
+    	colorMessageAreaMessage();
+    	
+    	errorMessage = false;
+    	
+    	
+    	correctMessageAreaHeight();
+    	
+    	hideCharInsertsNoAnimation();
+    }
+    
+    
+    public void messageExt(final String msg) {
+    	runOnUiThread(new Runnable() {
+			public void run() {
+				
+				((TextView) findViewById(R.id.message)).setText(msg);
+
+				colorMessageAreaMessage();
+
+				errorMessage = false;
+
+				
+				correctMessageAreaHeight();
+
+				hideCharInsertsNoAnimation();
+			}
+		});
+    }
+    
+    
+    public void message(CharSequence msg) {
+    	message(msg.toString());
+    }
+    
+    
+    public void error(String msg) {
+    	
+    	((TextView) findViewById(R.id.message)).setText(msg);
+    	
+    	colorMessageAreaError();
+    	
+    	errorMessage = true;
+    	
+    	
+    	correctMessageAreaHeight();
+    	
+    	hideCharInsertsNoAnimation();
+    }
+    
+    
+    public void errorExt(final String msg) {
+    	runOnUiThread(new Runnable() {
+			public void run() {
+				
+				((TextView) findViewById(R.id.message)).setText(msg);
+
+				colorMessageAreaError();
+
+				errorMessage = true;
+
+				
+				correctMessageAreaHeight();
+
+				hideCharInsertsNoAnimation();
+			}
+		});
+    }
+    
+    
+    public void error(CharSequence msg) {
+    	error(msg.toString());
+    }
+    
+    
+	protected void colorMessageAreaMessage() {
+    	
+    	((LinearLayout) findViewById(R.id.buffer)).setBackgroundColor(getResources().getColor(R.color.message_back));
+    	((TextView) findViewById(R.id.message)).setTextColor(getResources().getColor(R.color.message_text));
+    	
+    	
+    	toggleCharInserts.setImageResource(charInserts ? R.drawable.ic_caret_right_black : R.drawable.ic_caret_left_black);
+    	
+    	
+    	findViewById(R.id.toggle_char_inserts_separator).setBackgroundColor(getResources().getColor(R.color.toggle_char_inserts_separator));
+    	
+    	
+    	LinearLayout charInsertTrayList = (LinearLayout) findViewById(R.id.char_insert_tray_list);
+    	for(int i = 0; i < charInsertTrayList.getChildCount(); i ++) {
+    		((Button) charInsertTrayList.getChildAt(i)).setTextColor(getResources().getColor(R.color.char_insert_button));
+    	}
+    }
+    
+    
+	protected void colorMessageAreaError() {
+    	
+    	((LinearLayout) findViewById(R.id.buffer)).setBackgroundColor(getResources().getColor(R.color.error_back));
+    	((TextView) findViewById(R.id.message)).setTextColor(getResources().getColor(R.color.error_text));
+    	
+    	
+    	toggleCharInserts.setImageResource(charInserts ? R.drawable.ic_caret_right_white : R.drawable.ic_caret_left_white);
+    	
+    	
+    	findViewById(R.id.toggle_char_inserts_separator).setBackgroundColor(getResources().getColor(R.color.toggle_char_inserts_separator_light));
+    	
+    	
+    	LinearLayout charInsertTrayList = (LinearLayout) findViewById(R.id.char_insert_tray_list);
+    	for(int i = 0; i < charInsertTrayList.getChildCount(); i ++) {
+    		((Button) charInsertTrayList.getChildAt(i)).setTextColor(getResources().getColor(R.color.char_insert_button_light));
+    	}
+    }
+    
+    
+    protected void correctMessageAreaHeight() {
+    	final TextView messageArea = (TextView) findViewById(R.id.message);
+    	
+    	
+    	messageArea.requestLayout();
+    	
+    	
+    	messageArea.post(new Runnable() {
+    		public void run() {
+    			
+    			
+    			
+    			
+    			message = getTextViewHeight(getApplicationContext(), messageArea.getText().toString(), messageArea.getTextSize(), messageArea.getWidth(), messageArea.getPaddingTop());
+    			
+				findViewById(R.id.buffer).getLayoutParams().height = message;
+				
+    			
+    			View console = findViewById(R.id.console_scroller);
+    			View content = findViewById(R.id.content);
+				
+				if (isSelectedCodeAreaInitialized()) {
+					
+					
+					if (console.getHeight() <= 0) {
+						codePager.setLayoutParams(new LinearLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,
+								content.getHeight() - message - (extraHeaderView != null ? extraHeaderView.getHeight() : 0)));
+					} else {
+						console.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+								content.getHeight() - codePager.getHeight() - message - (extraHeaderView != null ? extraHeaderView.getHeight() : 0)));
+					}
+				}
+    		}
+    	});
+    }
+	
+	public void initCodeAreaAndConsoleDimensions() {
+		ScrollView console = getConsoleScroller();
+		
+		
+		codePager.getLayoutParams().height = codePager.getHeight();
+		console.getLayoutParams().height = console.getHeight();
+	}
+	
+	
+	public void refreshMessageAreaLocation() {
+		
+		final View content = findViewById(R.id.content);
+		final View console = findViewById(R.id.console_scroller);
+		final View code = getSelectedCodeAreaScroller();
+		final TextView messageArea = (TextView) findViewById(R.id.message);
+		
+		if (firstResize) {
+			
+			code.setLayoutParams(new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, code.getHeight()));
+			console.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, console.getHeight()));
+
+			firstResize = false;
+		}
+		
+		messageArea.requestLayout();
+		
+		messageArea.post(new Runnable() {
+			public void run() {
+				
+				
+				message = getTextViewHeight(getApplicationContext(), messageArea.getText().toString(), messageArea.getTextSize(), messageArea.getWidth(), messageArea.getPaddingTop());
+
+				int consoleSize = content.getHeight() - code.getHeight() - codeTabStrip.getHeight() - message - (extraHeaderView != null ? extraHeaderView.getHeight() : 0);
+
+				
+				
+				if (consoleSize < 0 || consoleWasHidden || keyboardVisible) {
+					console.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0));
+					code.setLayoutParams(new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,
+							content.getHeight() - codeTabStrip.getHeight() - message - (extraHeaderView != null ? extraHeaderView.getHeight() : 0)));
+
+					consoleWasHidden = true;
+				} else {
+					console.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, consoleSize));
+
+					consoleWasHidden = false;
+				}
+			}
+		});
+	}
+    
+    
+    
+    private static int getTextViewHeight(Context context, String text, float textSize, int deviceWidth, int padding) {
+    	TextView textView = new TextView(context);
+    	textView.setText(text);
+    	textView.setTextSize(TypedValue.COMPLEX_UNIT_PX, textSize);
+    	textView.setPadding(padding, padding, padding, padding);
+    	
+    	int widthMeasureSpec = MeasureSpec.makeMeasureSpec(deviceWidth, MeasureSpec.AT_MOST);
+    	int heightMeasureSpec = MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED);
+    	
+    	textView.measure(widthMeasureSpec, heightMeasureSpec);
+    	return textView.getMeasuredHeight();
+    }
+    
+    
+    public void highlightLineExt(final int tab, final int line) {
+    	runOnUiThread(new Runnable() {
+			public void run() {
+				
+				if (tab != -1 && tab < tabs.size()) {
+
+					selectCode(tab);
+				}
+
+				
+				CodeEditText code = getSelectedCodeArea();
+
+				
+				int start = code.offsetForLine(line);
+				int stop = code.offsetForLineEnd(line);
+
+				if (!PreferenceManager.getDefaultSharedPreferences(getApplicationContext()).getBoolean("use_hardware_keyboard", false)) {
+					
+
+					
+					MotionEvent me = MotionEvent.obtain(100, 0, 0, 0, 0, 0);
+					code.dispatchTouchEvent(me);
+					me.recycle();
+				}
+
+				
+				code.setSelection(start, stop);
+			}
+		});
+    }
+	
+	protected void addTabWithoutPagerUpdate(SketchFile sketchFile) {
+		tabs.add(sketchFile);
+	}
+	
+	public void addTab(SketchFile sketchFile) {
+		tabs.add(sketchFile);
+		codePagerAdapter.notifyDataSetChanged();
+	}
+	
+	public void onTabReselected(View view) {
+		if(!drawerOpen && !getGlobalState().isExample()) {
+			PopupMenu popup = new PopupMenu(getGlobalState().getEditor(), view);
+			
+			
+			MenuInflater inflater = getMenuInflater();
+			inflater.inflate(R.menu.tab_actions, popup.getMenu());
+			
+			
+			popup.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
+				@Override
+				public boolean onMenuItemClick(MenuItem item) {
+					switch(item.getItemId()) {
+					case R.id.menu_tab_new:
+						addTabWithDialog();
+						return true;
+					case R.id.menu_tab_rename:
+						renameTab();
+						return true;
+					case R.id.menu_tab_delete:
+						deleteTab();
+						return true;
+					}
+
+					return false;
+				}
+			});
+			popup.show();
+		}
+	}
+    
+    
+    private void addTabWithDialog() {
+    	createInputDialog(getResources().getString(R.string.tab_new_dialog_title), getResources().getString(R.string.tab_new_dialog_message), "", NEW_TAB);
+    }
+    
+    
+    private void addDefaultTab(String title) {
+    	
+
+    	
+
+    	
+    	
+
+
+    	addTab(new SketchFile(title));
+		
+    	
+
+    }
+    
+    
+	private void addTab(String title) {
+		
+
+    	
+
+    	
+    	
+
+
+    	addTab(new SketchFile(title));
+		
+		selectCode(getCodeCount() - 1);
+		
+    	
+
+
+    	
+    	
+
+	}
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+	
+    private void renameTab() {
+    	if(tabs.size() > 0 && !getGlobalState().isExample())
+    		createInputDialog(getResources().getString(R.string.tab_rename_dialog_title), getResources().getString(R.string.tab_rename_dialog_message), getSelectedSketchFile().getTitle(), RENAME_TAB);
+    }
+    
+    
+    private void deleteTab() {
+    	if(getGlobalState().isExample())
+    		return;
+    	
+    	AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle(R.string.delete_dialog_title)
+        	.setMessage(R.string.delete_dialog_message)
+        	.setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
+        		@Override
+        		public void onClick(DialogInterface dialog, int which) {
+        	}})
+        	.setPositiveButton(R.string.delete, new DialogInterface.OnClickListener() {
+        		@Override
+        		public void onClick(DialogInterface dialog, int which) {
+        			deleteTabContinue();
+        		}})
+        .show();
+    }
+    
+    
+    private boolean deleteLocalFile(String filename) {
+    	
+    	File sketchLoc = getGlobalState().getSketchLocation();
+    	
+    	File file = new File(sketchLoc + "/", filename);
+    	
+    	
+    	if (file.exists()) {
+    		file.delete();
+			
+    		return true;
+    	}
+    	
+    	return false;
+    }
+    
+    
+    private void deleteTabContinue() {
+    	if(tabs.size() > 0) {
+    		
+
+    		
+    		deleteLocalFile(getSelectedSketchFile().getFilename());
+			
+
+			getSelectedSketchFile().disable();
+    		
+
+			
+			
+			selectCode(getSelectedCodeIndex() - 1);
+			tabs.remove(getSelectedCodeIndex() + 1);
+
+	    	
+	    	
+	    	if(getCodeCount() <= 0) {
+
+
+
+
+
+
+
+
+
+
+
+	    		
+	    		
+
+	    		tabs.clear();
+	    		
+	    		
+	    		supportInvalidateOptionsMenu();
+	    	}
+		
+			codePagerAdapter.notifyDataSetChanged();
+			
+	    	
+	    	message(getResources().getText(R.string.tab_deleted));
+    	}
+    }
+    
+    
+    private void createInputDialog(String title, String message, String currentName, final int key) {
+    	
+    	AlertDialog.Builder alert = new AlertDialog.Builder(this);
+    	
+    	
+    	alert.setTitle(title);
+    	alert.setMessage(message);
+		
+		final EditText input = getGlobalState().createAlertDialogEditText(this, alert, currentName, true);
+    	
+    	
+    	alert.setPositiveButton(R.string.ok, new DialogInterface.OnClickListener() {
+    		public void onClick(DialogInterface dialog, int whichButton) {
+    			String value = input.getText().toString();
+    			checkInputDialog(key, true, value);
+				
+				if (!PreferenceManager.getDefaultSharedPreferences(getApplicationContext()).getBoolean("use_hardware_keyboard", false)) {
+					((InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(input.getWindowToken(), 0);
+				}
+    		}
+    	});
+    	
+    	
+    	alert.setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
+    		public void onClick(DialogInterface dialog, int whichButton) {
+    			checkInputDialog(key, false, "");
+				
+				if (!PreferenceManager.getDefaultSharedPreferences(getApplicationContext()).getBoolean("use_hardware_keyboard", false)) {
+					((InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(input.getWindowToken(), 0);
+				}
+    		}
+    	});
+    	
+    	
+    	AlertDialog dialog = alert.create();
+    	if(!PreferenceManager.getDefaultSharedPreferences(getApplicationContext()).getBoolean("use_hardware_keyboard", false)) {
+			dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
+		}
+    	dialog.show();
+    }
+    
+    
+    private void checkInputDialog(int key, boolean completed, String value) {
+    	if(completed) {
+    		
+    		if(!(validateFileName(value) || (value.endsWith(".java") && value.length() > 5 && validateFileName(value.substring(0, value.length() - 5))))) {
+    			return;
+    		}
+    		
+    		switch(key) {
+    		case RENAME_TAB:
+    			
+
+    			
+    			deleteLocalFile(getSelectedSketchFile().getFilename());
+    			
+    			
+
+
+
+    	    	getSelectedSketchFile().setTitle(value);
+				codePagerAdapter.notifyDataSetChanged();
+				
+    	    	
+    			message(getResources().getText(R.string.tab_renamed));
+    			
+    			break;
+    		case NEW_TAB:
+    			if (value.endsWith(".java")) {
+    				
+
+    		    	
+
+    		    	
+    		    	
+
+    		    	
+    		    	
+    		    	SketchFile meta = new SketchFile(value.substring(0, value.length() - 5));
+    		    	meta.setSuffix(".java");
+    		    	
+
+					addTab(meta);
+					selectCode(getCodeCount() - 1);
+    		    	
+    		    	
+
+
+    		    	
+    		    	
+
+    				
+    				
+
+
+    				
+
+    			} else {
+    				
+    				addTab(value);
+    				
+
+					selectCode(getCodeCount() - 1);
+    				
+
+    			}
+    			
+    			
+				if (getCodeCount() == 1) {
+					supportInvalidateOptionsMenu();
+				}
+				
+				
+
+
+				
+				
+				message(getResources().getText(R.string.tab_created));
+				
+				break;
+    		}
+    	}
+    }
+    
+
+
+
+    
+    public void clearUndoRedoHistory() {
+    	for (SketchFile meta : tabs) {
+    		meta.clearUndoRedo();
+    	}
+    }
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+	
+	private boolean externalStorageWritable() {
+		String state = Environment.getExternalStorageState();
+		if (Environment.MEDIA_MOUNTED.equals(state)) return true;
+		else return false;
+	}
+	
+	
+	protected boolean validateFileName(String title) {
+		
+		if (title.length() <= 0) {
+			error(getResources().getText(R.string.name_invalid_no_char));
+			return false;
+		}
+		
+		
+		char first = title.charAt(0);
+		if ((first >= '0' && first <= '9') || first == '_') {
+			error(getResources().getText(R.string.name_invalid_first_char));
+			return false;
+		}
+		
+		
+		for (int i = 0; i < title.length(); i ++) {
+			char c = title.charAt(i);
+			if (c >= '0' && c <= '9') continue;
+			if (c >= 'a' && c <= 'z') continue;
+			if (c >= 'A' && c <= 'Z') continue;
+			if (c == '_') continue;
+			
+			error(getResources().getText(R.string.name_invalid_char));
+			return false;
+		}
+		
+		
+		for (SketchFile meta : tabs) {
+			if (meta.getTitle().equals(title)) {
+				error(getResources().getText(R.string.name_invalid_same_title));
+				return false;
+			}
+		}
+		
+		return true;
+	}
+	
+	private void launchTools() {
+		final ArrayList<Tool> toolList = getGlobalState().getToolsInList();
+		
+		
+		
+		AlertDialog.Builder builder = new AlertDialog.Builder(this);
+		builder.setTitle(R.string.tools);
+		if(toolList.size() > 0) {
+			
+			builder.setItems(getGlobalState().listToolsInList(), new DialogInterface.OnClickListener() {
+				public void onClick(DialogInterface dialog, int which) {
+					runOnUiThread(toolList.get(which));
+				}
+			});
+		} else {
+			
+			System.err.println("Couldn't find any tools... uh-oh...");
+		}
+		
+		final AlertDialog dialog = builder.create();
+		
+		dialog.setCanceledOnTouchOutside(true);
+		dialog.show();
+	}
+	
+	public void launchImportLibrary() {
+		getGlobalState().rebuildLibraryList();
+		final String[] libList = getGlobalState().listLibraries();
+		
+		
+		
+		AlertDialog.Builder builder = new AlertDialog.Builder(this);
+		builder.setTitle(R.string.import_library);
+		if(libList.length > 0) {
+			
+			builder.setItems(libList, new DialogInterface.OnClickListener() {
+				public void onClick(DialogInterface dialog, int which) {
+					addImports(getGlobalState().getLibraryByName(libList[which]).getPackageList(getGlobalState()));
+				}
+			});
+		} else {
+			
+			
+			
+			TextView content = new TextView(this);
+			content.setText(R.string.no_contributed_libraries); 
+			content.setTextColor(getResources().getColor(R.color.grayed_out)); 
+			content.setGravity(Gravity.CENTER); 
+			content.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)); 
+			content.setPadding(60, 60, 60, 60); 
+			content.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+			
+			builder.setView(content);
+		}
+		
+		
+		builder.setNeutralButton(R.string.manage_libraries, null);
+		final AlertDialog dialog = builder.create();
+		
+		
+		
+		dialog.setOnShowListener(new DialogInterface.OnShowListener() {
+			@Override
+			public void onShow(final DialogInterface dialog) {
+				Button b = ((AlertDialog) dialog).getButton(AlertDialog.BUTTON_NEUTRAL);
+				b.setOnClickListener(new View.OnClickListener() {
+					@Override
+					public void onClick(View view) {
+						launchManageLibraries();
+						
+						
+						dialog.dismiss();
+					}
+				});
+			}
+		});
+		
+		dialog.setCanceledOnTouchOutside(true);
+		dialog.show();
+	}
+	
+	public void launchManageLibraries() {
+		getGlobalState().rebuildLibraryList();
+		
+		Intent intent = new Intent(this, LibraryManagerActivity.class);
+		startActivity(intent);
+	}
+	
+	
+	private void launchSketchProperties() {
+		Intent intent = new Intent(this, SketchPropertiesActivity.class);
+		startActivity(intent);
+	}
+	
+	
+	private void launchSettings() {
+		startActivity(new Intent(this, SettingsActivity.class));
+	}
+	
+	
+	public void addImports(String[] imports) {
+		
+		if(getGlobalState().isExample())
+			return;
+		
+		
+		
+		
+		String importList = "";
+		
+		
+		for(String im : imports) {
+			
+			importList += "import " + im + ".*;\n";
+		}
+		
+		
+		importList += "\n";
+		
+		
+		if(getCodeCount() <= 0)
+			return;
+		
+		
+
+		selectCode(0);
+		
+
+		CodeEditText code = getSelectedCodeArea();
+		
+		
+		code.setSelection(0);
+		
+		
+		code.setUpdateText(importList + code.getText());
+		
+		
+		code.updateTokens();
+		code.updateBracketMatch();
+	}
+	
+	
+	public boolean isSaved() {
+		
+		
+		return saved;
+	}
+	
+	
+	public void setSaved(boolean saved) {
+		this.saved = saved;
+	}
+	
+	
+	public ArrayList<SketchFile> getSketchFiles() {
+		return tabs;
+	}
+	
+	
+	public SketchFile[] getTabMetas() {
+		SketchFile[] metas = new SketchFile[getCodeCount()];
+		
+		for (int i = 0; i < getCodeCount(); i ++) {
+			metas[i] = tabs.get(i);
+		}
+		
+		return metas;
+	}
+	
+	
+	public void postConsole(String msg) {
+		
+		if (FLAG_SUSPEND_OUT_STREAM.get() && !PreferenceManager.getDefaultSharedPreferences(this).getBoolean("pref_debug_global_verbose_output", false)) {
+			return;
+		}
+		
+		final TextView tv = (TextView) findViewById(R.id.console);
+		
+		
+		tv.append(msg);
+		
+		final ScrollView scroll = ((ScrollView) findViewById(R.id.console_scroller));
+		final HorizontalScrollView scrollX = ((HorizontalScrollView) findViewById(R.id.console_scroller_x));
+		
+		
+		if(PreferenceManager.getDefaultSharedPreferences(getApplicationContext()).getBoolean("pref_scroll_lock", true))
+			scroll.post(new Runnable() {
+				@Override
+				public void run() {
+					
+					scroll.fullScroll(ScrollView.FOCUS_DOWN);
+					
+					scrollX.post(new Runnable() {
+						public void run() {
+							
+							
+							scrollX.scrollTo(0, 0);
+						}
+					});
+			}});
+	}
+	
+	
+	public class MessageTouchListener implements android.view.View.OnLongClickListener, android.view.View.OnTouchListener {
+		private boolean pressed;
+		private int touchOff;
+		
+		private View console;
+		private View content;
+		
+		public MessageTouchListener() {
+			super();
+			
+			pressed = false;
+			
+			
+			console = findViewById(R.id.console_scroller);
+			content = findViewById(R.id.content);
+		}
+		
+		@SuppressWarnings("deprecation")
+		@Override
+		public boolean onTouch(View view, MotionEvent event) {
+			
+			if(keyboardVisible)
+				return false;
+			
+			
+			if(event.getAction() == MotionEvent.ACTION_DOWN)
+				touchOff = (int) event.getY();
+			
+			if(pressed) {
+				switch(event.getAction()) {
+				case MotionEvent.ACTION_MOVE:
+					if(message == -1) {
+						message = findViewById(R.id.buffer).getHeight();
+					}
+					
+					
+					
+					
+					
+					
+					int maxCode = content.getHeight() - message - codeTabStrip.getHeight() - (extraHeaderView != null ? extraHeaderView.getHeight() : 0);
+					
+					
+					int y = (int) event.getY() - touchOff;
+					
+					
+					int consoleDim = console.getHeight() - y;
+					if (consoleDim < 0) {
+						consoleDim = 0;
+					}
+					if (consoleDim > maxCode) {
+						consoleDim = maxCode;
+					}
+					
+					
+					int codeDim = maxCode - consoleDim;
+					
+					
+					codePager.setLayoutParams(new android.widget.LinearLayout.LayoutParams(android.widget.LinearLayout.LayoutParams.MATCH_PARENT, codeDim + codeTabStrip.getHeight()));
+					console.setLayoutParams(new android.widget.LinearLayout.LayoutParams(android.widget.LinearLayout.LayoutParams.MATCH_PARENT, consoleDim));
+					
+					firstResize = false;
+					
+					if (consoleDim > 0) {
+						consoleWasHidden = false;
+					}
+					
+					return true;
+				case MotionEvent.ACTION_UP:
+					pressed = false;
+					
+					LinearLayout buffer = (LinearLayout) findViewById(R.id.buffer);
+					TextView messageArea = (TextView) findViewById(R.id.message);
+					
+					
+					if(errorMessage) {
+						buffer.setBackgroundDrawable(getResources().getDrawable(R.drawable.back_error));
+						messageArea.setTextColor(getResources().getColor(R.color.error_text));
+					} else {
+						buffer.setBackgroundDrawable(getResources().getDrawable(R.drawable.back));
+						messageArea.setTextColor(getResources().getColor(R.color.message_text));
+					}
+					
+					return true;
+				}
+			}
+			
+			return false;
+		}
+		
+		@SuppressWarnings("deprecation")
+		@Override
+		public boolean onLongClick(View view) {
+			
+			if(keyboardVisible)
+				return false;
+			
+			pressed = true;
+			
+			LinearLayout buffer = (LinearLayout) findViewById(R.id.buffer);
+			TextView messageArea = (TextView) findViewById(R.id.message);
+			
+			
+			if(errorMessage) {
+				buffer.setBackgroundDrawable(getResources().getDrawable(R.drawable.back_error_selected));
+				messageArea.setTextColor(getResources().getColor(R.color.error_text));
+			} else {
+				buffer.setBackgroundDrawable(getResources().getDrawable(R.drawable.back_selected));
+				messageArea.setTextColor(getResources().getColor(R.color.message_text));
+			}
+			
+			
+			if(PreferenceManager.getDefaultSharedPreferences(getApplicationContext()).getBoolean("pref_vibrate", true))
+				((android.os.Vibrator) getSystemService(VIBRATOR_SERVICE)).vibrate(200); 
+			
+			return true;
+		}
+	}
+	
+	
+	private class ConsoleStream extends OutputStream {
+		final byte single[] = new byte[1];
+		
+		public ConsoleStream() {
+		}
+		
+		public void close() { }
+		
+		public void flush() { }
+		
+		public void write(byte b[]) {
+			write(b, 0, b.length);
+		}
+		
+		@Override
+		public void write(byte b[], int offset, int length) {
+			final String value = new String(b, offset, length);
+			
+			if (!(FLAG_SUSPEND_OUT_STREAM.get() &&
+					!PreferenceManager.getDefaultSharedPreferences(EditorActivity.this)
+							.getBoolean("pref_debug_global_verbose_output", false))) {
+				
+				runOnUiThread(new Runnable() {
+					public void run() {
+						
+						postConsole(value);
+					}
+				});
+			}
+		}
+		
+		@Override
+		public void write(int b) {
+			single[0] = (byte) b;
+			write(single, 0, 1);
+		}
+	}
+	
+	
+	
+	public abstract class UpgradeChange implements Runnable {
+		public int changeVersion;
+		
+		public UpgradeChange(int changeVersion) {
+			this.changeVersion = changeVersion;
+		}
+	}
+	
+	public void runUpgradeChanges(int from, int to) {
+		ArrayList<UpgradeChange> upgradeChanges = new ArrayList<UpgradeChange>();
+		
+		
+		
+		
+
+		
+		upgradeChanges.add(new UpgradeChange(13) {
+			@Override
+			public void run() {
+				
+				new Thread(new Runnable() {
+					public void run() {
+						copyAssetFolder(getAssets(), "examples", getGlobalState().getStarterExamplesFolder().getAbsolutePath());
+					}
+				}).start();
+			}
+		});
+		
+		
+		
+		
+		upgradeChanges.add(new UpgradeChange(14) {
+			@Override
+			public void run() {
+				SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(EditorActivity.this);
+				
+				if (prefs.contains("pref_build_discard")) {
+					SharedPreferences.Editor edit = prefs.edit();
+					edit.putBoolean("pref_build_folder_keep", !prefs.getBoolean("pref_build_discard", true));
+					edit.apply();
+				}
+			}
+		});
+		
+		
+		
+		
+		upgradeChanges.add(new UpgradeChange(16) {
+			@Override
+			public void run() {
+				getGlobalState().getTaskManager().launchTask("recopyAndroidJarTask", false, null, false, new CopyAndroidJarTask());
+			}
+		});
+		
+		
+		upgradeChanges.add(new UpgradeChange(16) {
+			@Override
+			public void run() {
+				try {
+					
+					
+					
+					
+					File examplesRepo = getGlobalState().getExamplesRepoFolder();
+					if (examplesRepo.exists()) {
+						APDE.deleteFile(examplesRepo);
+					}
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+		});
+		
+		
+		
+		for (UpgradeChange upgradeChange : upgradeChanges) {
+			if (from < upgradeChange.changeVersion && to >= upgradeChange.changeVersion) {
+				upgradeChange.run();
+			}
+		}
+	}
+}

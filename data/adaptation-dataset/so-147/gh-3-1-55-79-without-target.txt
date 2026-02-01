@@ -1,0 +1,103 @@
+package name.abuchen.portfolio.ui;
+
+import java.net.Authenticator;
+import java.net.PasswordAuthentication;
+import java.util.List;
+
+import org.eclipse.core.runtime.IPath;
+import org.eclipse.core.runtime.IStatus;
+import org.eclipse.core.runtime.Platform;
+import org.eclipse.core.runtime.Status;
+import org.eclipse.core.runtime.jobs.Job;
+import org.eclipse.core.runtime.preferences.InstanceScope;
+import org.eclipse.jface.preference.IPreferenceStore;
+import org.osgi.framework.Bundle;
+import org.osgi.framework.BundleActivator;
+import org.osgi.framework.BundleContext;
+import org.osgi.framework.FrameworkUtil;
+
+import name.abuchen.portfolio.ui.preferences.ScopedPreferenceStore;
+
+public class PortfolioPlugin implements BundleActivator
+{
+    public static final String PLUGIN_ID = "name.abuchen.portfolio.ui"; 
+
+    private static PortfolioPlugin instance;
+
+    private Bundle bundle;
+    private IPreferenceStore preferenceStore;
+
+    public PortfolioPlugin()
+    {
+        super();
+        instance = this;
+    }
+
+    @Override
+    public void start(BundleContext context) throws Exception
+    {
+        bundle = context.getBundle();
+
+        setupProxyAuthenticator();
+
+        preferenceStore = new ScopedPreferenceStore(InstanceScope.INSTANCE, PortfolioPlugin.PLUGIN_ID);
+    }
+
+    @Override
+    public void stop(BundleContext context) throws Exception
+    {
+        if (preferenceStore != null && preferenceStore.needsSaving())
+            ((ScopedPreferenceStore) preferenceStore).save();
+
+        Job.getJobManager().cancel(null);
+    }
+
+    // TODO
+
+
+    public Bundle getBundle()
+    {
+        return bundle;
+    }
+
+    public IPreferenceStore getPreferenceStore()
+    {
+        return preferenceStore;
+    }
+
+    public IPath getStateLocation()
+    {
+        return Platform.getStateLocation(bundle);
+    }
+
+    public static PortfolioPlugin getDefault()
+    {
+        return instance;
+    }
+
+    public static final void log(IStatus status)
+    {
+        Platform.getLog(FrameworkUtil.getBundle(PortfolioPlugin.class)).log(status);
+    }
+
+    public static void log(Throwable t)
+    {
+        log(new Status(Status.ERROR, PLUGIN_ID, t.getMessage(), t));
+    }
+
+    public static void log(String message)
+    {
+        log(new Status(Status.ERROR, PLUGIN_ID, message));
+    }
+
+    public static void log(List<Exception> errors)
+    {
+        for (Exception e : errors)
+            log(e);
+    }
+
+    public static boolean isDevelopmentMode()
+    {
+        return System.getProperty("osgi.dev") != null; 
+    }
+}

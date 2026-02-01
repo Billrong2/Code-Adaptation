@@ -1,0 +1,49 @@
+package com.griefcraft.cache;
+
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+
+public class MethodCounter {
+
+    
+    private final Map<String, Integer> counts = new HashMap<String, Integer>();
+
+    
+    public void increment(String method) {
+        deltaMethod(method, 1);
+    }
+
+    
+    public void decrement(String method) {
+        deltaMethod(method, -1);
+    }
+
+    
+    public int get(String method) {
+        return counts.containsKey(method) ? counts.get(method) : 0;
+    }
+
+    
+    public Map<String, Integer> sortByValue() {
+        return Collections.unmodifiableMap(sortByComparator(counts, false));
+    }
+
+    
+    private void deltaMethod(String method, int delta) {
+        if (!counts.containsKey(method)) {
+            counts.put(method, delta);
+            return;
+        }
+
+        counts.put(method, counts.get(method) + delta);
+    }
+
+        // TODO
+
+
+}

@@ -1,0 +1,151 @@
+
+package com.google.cloud.bigtable.config;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.lang.reflect.Field;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.junit.Assert;
+import org.junit.Test;
+
+public class TestBigtableOptions {
+
+  @Test
+  public void testEquals() {
+    BigtableOptions options1 = new BigtableOptions.Builder()
+        .setProjectId("project")
+        .setInstanceId("instance")
+        .setUserAgent("foo")
+        .setCredentialOptions(CredentialOptions.nullCredential())
+        .build();
+    BigtableOptions options2 = new BigtableOptions.Builder()
+        .setProjectId("project")
+        .setInstanceId("instance")
+        .setUserAgent("foo")
+        .setCredentialOptions(CredentialOptions.nullCredential())
+        .build();
+    BigtableOptions options3 = new BigtableOptions.Builder()
+        .setProjectId("project")
+        .setInstanceId("instance")
+        .setUserAgent("foo1")
+        .setCredentialOptions(CredentialOptions.nullCredential())
+        .build();
+    BigtableOptions options4 = new BigtableOptions.Builder()
+        .setProjectId("project")
+        .setInstanceId("instance")
+        .setUserAgent("foo1")
+        .setCredentialOptions(CredentialOptions.defaultCredentials())
+        .build();
+
+    Assert.assertEquals(options1, options2);
+    Assert.assertNotEquals(options1, options3);
+    Assert.assertNotEquals(options1, options4);
+  }
+
+  @Test
+  public void testSerialization() throws IOException, ClassNotFoundException {
+    BigtableOptions options = new BigtableOptions.Builder()
+        .setProjectId("project")
+        .setInstanceId("instance")
+        .setUserAgent("foo")
+        .build();
+    ByteArrayOutputStream bos = new ByteArrayOutputStream();
+    ObjectOutputStream oos = new ObjectOutputStream(bos);
+    oos.writeObject(options);
+    oos.close();
+    byte[] byteArray = bos.toByteArray();
+
+    ByteArrayInputStream bais = new ByteArrayInputStream(byteArray);
+    ObjectInputStream iis = new ObjectInputStream(bais);
+
+    BigtableOptions deserialized = (BigtableOptions) iis.readObject();
+    Assert.assertEquals(options, deserialized);
+  }
+
+  @Test
+  public void testNullStringsDontThrowExceptions() {
+     new BigtableOptions.Builder().build();
+  }
+
+  @Test
+  public void testZoneClusterPair() {
+    try {
+      new BigtableOptions.Builder()
+          .setProjectId("project")
+          .setUserAgent("foo")
+          .setClusterId("cluster")
+          .build();
+      Assert.fail("Expected exception");
+    } catch (IllegalArgumentException expected) {}
+
+    try {
+      new BigtableOptions.Builder()
+          .setProjectId("project")
+          .setUserAgent("foo")
+          .setZoneId("zone")
+          .build();
+      Assert.fail("Expected exception");
+    } catch (IllegalArgumentException expected) {}
+
+    BigtableOptions options = new BigtableOptions.Builder()
+        .setProjectId("project")
+        .setUserAgent("foo")
+        .setClusterId("cluster")
+        .setZoneId("zone")
+        .build();
+    Assert.assertEquals("cluster", options.getClusterId());
+    Assert.assertEquals("zone", options.getZoneId());
+  }
+
+  @Test
+  public void testInstanceWithCluster() {
+    BigtableOptions options = new BigtableOptions.Builder()
+        .setProjectId("project")
+        .setUserAgent("foo")
+        .setClusterId("cluster")
+        .setZoneId("zone")
+        .setInstanceId("instance")
+        .build();
+    Assert.assertEquals("cluster", options.getClusterId());
+    Assert.assertEquals("zone", options.getZoneId());
+    Assert.assertEquals("instance", options.getInstanceId());
+  }
+
+  @Test
+  public void testEmulator() {
+    Map<String, String> oldEnv = System.getenv();
+    Map<String, String> testEnv = new HashMap<>();
+    testEnv.put(BigtableOptions.BIGTABLE_EMULATOR_HOST_ENV_VAR, "localhost:1234");
+    setTestEnv(testEnv);
+    BigtableOptions options = new BigtableOptions.Builder()
+        .setPort(443)
+        .setDataHost("xxx")
+        .build();
+    Assert.assertEquals(1234, options.getPort());
+    Assert.assertEquals("localhost", options.getDataHost());
+    Assert.assertEquals("localhost", options.getInstanceAdminHost());
+    Assert.assertEquals("localhost", options.getTableAdminHost());
+    Assert.assertTrue(options.usePlaintextNegotiation());
+    Assert.assertEquals(CredentialOptions.nullCredential(), options.getCredentialOptions());
+
+    setTestEnv(oldEnv);
+    options = new BigtableOptions.Builder()
+        .setDataHost("override")
+        .build();
+    Assert.assertEquals(BigtableOptions.BIGTABLE_PORT_DEFAULT, options.getPort());
+    Assert.assertEquals("override", options.getDataHost());
+    Assert.assertEquals(BigtableOptions.BIGTABLE_INSTANCE_ADMIN_HOST_DEFAULT, options.getInstanceAdminHost());
+    Assert.assertEquals(BigtableOptions.BIGTABLE_TABLE_ADMIN_HOST_DEFAULT, options.getTableAdminHost());
+    Assert.assertFalse(options.usePlaintextNegotiation());
+    Assert.assertEquals(CredentialOptions.defaultCredentials(), options.getCredentialOptions());
+  }
+
+    // TODO
+
+}

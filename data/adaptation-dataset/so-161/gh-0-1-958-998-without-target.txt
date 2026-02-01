@@ -1,0 +1,1845 @@
+
+package org.jdesktop.swingx.renderer;
+
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Dimension;
+import java.awt.Point;
+import java.awt.event.ActionEvent;
+import java.awt.event.ComponentEvent;
+import java.awt.event.ComponentListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.beans.BeanInfo;
+import java.beans.IntrospectionException;
+import java.beans.Introspector;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
+import java.beans.PropertyDescriptor;
+import java.io.File;
+import java.lang.reflect.Method;
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.sql.Time;
+import java.sql.Timestamp;
+import java.text.DateFormat;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.logging.Logger;
+
+import javax.swing.AbstractAction;
+import javax.swing.AbstractButton;
+import javax.swing.AbstractListModel;
+import javax.swing.Action;
+import javax.swing.BorderFactory;
+import javax.swing.Box;
+import javax.swing.DefaultListModel;
+import javax.swing.Icon;
+import javax.swing.ImageIcon;
+import javax.swing.JButton;
+import javax.swing.JCheckBox;
+import javax.swing.JComponent;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JList;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTable;
+import javax.swing.JTextArea;
+import javax.swing.JTree;
+import javax.swing.KeyStroke;
+import javax.swing.ListCellRenderer;
+import javax.swing.ListModel;
+import javax.swing.SwingConstants;
+import javax.swing.UIDefaults;
+import javax.swing.UIManager;
+import javax.swing.border.Border;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ListSelectionEvent;
+import javax.swing.event.TableColumnModelEvent;
+import javax.swing.event.TableColumnModelListener;
+import javax.swing.filechooser.FileSystemView;
+import javax.swing.table.AbstractTableModel;
+import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableCellRenderer;
+import javax.swing.table.TableModel;
+import javax.swing.tree.DefaultMutableTreeNode;
+import javax.swing.tree.DefaultTreeModel;
+import javax.swing.tree.TreeCellRenderer;
+import javax.swing.tree.TreeModel;
+
+import org.jdesktop.swingx.InteractiveTestCase;
+import org.jdesktop.swingx.JXEditorPaneTest;
+import org.jdesktop.swingx.JXFrame;
+import org.jdesktop.swingx.JXHyperlink;
+import org.jdesktop.swingx.JXLabel;
+import org.jdesktop.swingx.JXList;
+import org.jdesktop.swingx.JXPanel;
+import org.jdesktop.swingx.JXTable;
+import org.jdesktop.swingx.JXTree;
+import org.jdesktop.swingx.JXTreeTable;
+import org.jdesktop.swingx.action.AbstractActionExt;
+import org.jdesktop.swingx.decorator.AbstractHighlighter;
+import org.jdesktop.swingx.decorator.BorderHighlighter;
+import org.jdesktop.swingx.decorator.ColorHighlighter;
+import org.jdesktop.swingx.decorator.ComponentAdapter;
+import org.jdesktop.swingx.decorator.HighlightPredicate;
+import org.jdesktop.swingx.decorator.Highlighter;
+import org.jdesktop.swingx.decorator.HighlighterFactory;
+import org.jdesktop.swingx.decorator.HighlighterFactory.UIColorHighlighter;
+import org.jdesktop.swingx.decorator.PainterHighlighter;
+import org.jdesktop.swingx.decorator.PatternPredicate;
+import org.jdesktop.swingx.hyperlink.EditorPaneLinkVisitor;
+import org.jdesktop.swingx.hyperlink.HyperlinkAction;
+import org.jdesktop.swingx.hyperlink.LinkModel;
+import org.jdesktop.swingx.hyperlink.LinkModelAction;
+import org.jdesktop.swingx.painter.BusyPainter;
+import org.jdesktop.swingx.painter.ImagePainter;
+import org.jdesktop.swingx.painter.MattePainter;
+import org.jdesktop.swingx.rollover.RolloverRenderer;
+import org.jdesktop.swingx.table.ColumnControlButton;
+import org.jdesktop.swingx.test.ComponentTreeTableModel;
+import org.jdesktop.swingx.test.XTestUtils;
+import org.jdesktop.swingx.treetable.FileSystemModel;
+import org.jdesktop.swingx.treetable.TreeTableModel;
+import org.jdesktop.swingx.treetable.TreeTableNode;
+import org.jdesktop.swingx.util.PaintUtils;
+import org.jdesktop.test.AncientSwingTeam;
+
+
+public class RendererVisualCheck extends InteractiveTestCase {
+    @SuppressWarnings("unused")
+    private static final Logger LOG = Logger
+            .getLogger(RendererVisualCheck.class.getName());
+    
+    public static void main(String[] args) {
+        
+        
+        
+        
+        setLAF("Nim");
+        RendererVisualCheck test = new RendererVisualCheck();
+        try {
+
+
+
+
+
+
+
+
+
+
+
+            test.runInteractive("Opacity");
+            test.runInteractive("CheckBox");
+
+
+            
+        } catch (Exception e) {
+            System.err.println("exception when executing interactive tests:");
+            e.printStackTrace();
+        }
+    }
+
+    
+    public void interactiveTreeRendererExtendsOpacity() {
+        JXTree table = new JXTree();
+        table.expandAll();
+        final WrappingProvider wrapper = new WrappingProvider();
+        table.setCellRenderer(new DefaultTreeRenderer(wrapper));
+        table.addHighlighter(HighlighterFactory.createSimpleStriping());
+        JXFrame frame = wrapWithScrollingInFrame(table, "background on icon?");
+        addAction(frame, createToggleExtendsOpacityAction(wrapper, table));
+        show(frame);
+    }
+    
+    private Action createToggleExtendsOpacityAction(final WrappingProvider provider, final JComponent target) {
+        final String text = "toggle extendsOpacity to: ";
+        Action a = new AbstractAction(text + !provider.getExtendsComponentOpacity()) {
+            
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                boolean old = provider.getExtendsComponentOpacity();
+                provider.setExtendsComponentOpacity(!old);
+                putValue(Action.NAME, text + old);
+                target.repaint();
+            }
+        };
+        return a;
+    }
+
+
+    
+    
+    public void interactiveRendererCheckBox() {
+        JRendererCheckBox opaque = new JRendererCheckBox();
+        opaque.setText("I'm opaque without painter");
+        opaque.setBackground(Color.YELLOW);
+        
+        JRendererCheckBox opaqueWith = new JRendererCheckBox();
+        opaqueWith.setText("I'm opaque with painter");
+        opaqueWith.setBackground(Color.YELLOW);
+        opaqueWith.setPainter(new ImagePainter(XTestUtils.loadDefaultImage()));
+        opaqueWith.setForeground(Color.GREEN);
+        
+        JRendererCheckBox transparent = new JRendererCheckBox();
+        transparent.setText("I'm transparent without painter");
+        transparent.setBackground(Color.YELLOW);
+
+        transparent.setOpaque(false);
+
+        
+        
+        JRendererCheckBox transparentWith = new JRendererCheckBox();
+        transparentWith.setText("I'm transparent WITH painter");
+        transparentWith.setBackground(Color.YELLOW);
+
+        transparentWith.setOpaque(false);
+        transparentWith.setPainter(new ImagePainter(XTestUtils.loadDefaultImage()));
+        transparentWith.setForeground(Color.GREEN);
+        
+        
+        JCheckBox plain = new JCheckBox("I'm a plain default box");
+        plain.setBackground(Color.YELLOW);
+
+        
+        JPanel content = new JPanel();
+        content.setBackground(Color.WHITE);
+        content.add(opaque);
+        content.add(opaqueWith);
+        content.add(transparent);
+        content.add(transparentWith);
+        content.add(plain);
+        JXFrame frame = wrapInFrame(content, "checkRendereres");
+        show(frame);
+        
+    }
+    
+    public void interactiveCheckBoxRendererOpacity1513() {
+        JXPanel panel = new JXPanel(new BorderLayout());
+        panel.setBackgroundPainter(new ImagePainter(XTestUtils.loadDefaultImage("moon.jpg")));
+        JXTable table = new JXTable(new AncientSwingTeam());
+        table.addHighlighter(HighlighterFactory.createSimpleStriping());
+        table.addHighlighter(new PainterHighlighter(HighlightPredicate.ROLLOVER_ROW, 
+                new MattePainter(PaintUtils.setAlpha(Color.RED, 100))));
+
+        panel.add(new JScrollPane(table));
+        table.setOpaque(false);
+        JComponent comp = (JComponent) table.prepareRenderer(0, 0);
+        comp.setOpaque(false);
+        AbstractButton checkBox = (AbstractButton) table.prepareRenderer(0, AncientSwingTeam.BOOLEAN_COLUMN);
+        checkBox.setOpaque(false);
+        ((JComponent) table.getParent()).setOpaque(false);
+        ((JComponent) table.getParent().getParent()).setOpaque(false);
+        showInFrame(panel, "Checkbox: set to opacity");
+    }
+
+    
+    public void interactiveCheckBoxEditorSelectBackground() {
+        JXTable table = new JXTable(new AncientSwingTeam());
+        JTable core = new JTable(table.getModel());
+        
+        JComponent comp = Box.createHorizontalBox();
+        comp.add(new JScrollPane(table));
+        comp.add(new JScrollPane(core));
+        showInFrame(comp, "compare checkbox editor x <-> core");
+    }
+    
+    public void interactiveCheckBoxRendererOpacity897() {
+        JXTable table = new JXTable(new AncientSwingTeam());
+        table.addHighlighter(HighlighterFactory.createSimpleStriping());
+        table.addHighlighter(new PainterHighlighter(HighlightPredicate.ROLLOVER_ROW, 
+                new MattePainter(PaintUtils.setAlpha(Color.RED, 100))));
+
+        showWithScrollingInFrame(table, "Checkbox: striping lost on rollover");
+    }
+
+
+
+    
+    
+    public void interactiveButtonProvider() {
+        JXTable table = new JXTable(new AncientSwingTeam());
+        table.getColumn(0).setCellRenderer(new DefaultTableRenderer(new ButtonProvider()));
+        table.getColumn(1).setCellRenderer(new DefaultTableRenderer(
+                new WrappingProvider(IconValues.NONE, new ButtonProvider(), false) {
+
+                    @Override
+                    protected void configureState(CellContext context) {
+                        super.configureState(context);
+                        rendererComponent.getComponent().setVisible(true);
+                    }
+
+                    @Override
+                    public boolean isEnabled() {
+                        boolean enabled = super.isEnabled();
+                        LOG.info("rollover " + enabled);
+                        return enabled;
+                    }
+                    
+                    
+                }
+        ));
+        
+        AbstractHighlighter highlighter = new AbstractHighlighter(HighlightPredicate.EVEN) {
+
+            @Override
+            protected Component doHighlight(Component component,
+                    ComponentAdapter adapter) {
+                ((WrappingIconPanel) component).getComponent().setVisible(false);
+                return component;
+            }
+
+            @Override
+            protected boolean canHighlight(Component component,
+                    ComponentAdapter adapter) {
+                return component instanceof WrappingIconPanel;
+            }
+            
+            
+        };
+
+        showWithScrollingInFrame(table, "invisible button");
+    }
+    
+    public static class ButtonProvider extends ComponentProvider<JButton> implements 
+       RolloverRenderer {
+
+        @Override
+        protected void format(CellContext context) {
+            rendererComponent.setText(getValueAsString(context));
+        }
+
+        @Override
+        protected void configureState(CellContext context) {
+            rendererComponent.setHorizontalAlignment(getHorizontalAlignment());
+        }
+
+        @Override
+        protected JButton createRendererComponent() {
+            return new JButton("View online");
+        }
+
+        @Override
+        public boolean isEnabled() {
+            return rendererComponent.isVisible();
+        }
+
+        @Override
+        public void doClick() {
+            
+            
+        }
+
+        
+    }
+    
+
+    
+    private Object[] columnNames = {
+            "Buy/Sell", "Type", "SubType", "Ccy1", "Amount1", "Ccy2", "Amount2", "DealId"};
+        private Object[][] data = {
+            {"Buy&Sell", "Ccy Swap", "A1", "EUR", new Double(1000000.00), "USD", new Double(1439000.00), 50},
+            {"Buy&Sell", "Ccy Swap", "A3", "USD", new Double(1438900.00), "EUR", new Double(1000000.00), 50},
+            {"Buy&Sell", "Ccy Swap", "A1", "EUR", new Double(500000.00), "CHF", new Double(550000.00), 350},
+            {"Buy&Sell", "Ccy Swap", "A1", "CHF", new Double(549800.00), "EUR", new Double(500000.00), 350},
+            {"Sell&Buy", "Ccy Swap", "A3", "USD", new Double(1000000.00), "EUR", new Double(749000.00), 2250},
+            {"Sell&Buy", "Ccy Swap", "A1", "EUR", new Double(748900.00), "USD", new Double(1000000.00), 2250},
+            {"Buy&Sell", "Ccy Swap", "A1", "GBP", new Double(1000000.00), "USD", new Double(1638100.00), 400},
+            {"Buy&Sell", "Ccy Swap", "A3", "USD", new Double(1638200.00), "GBP", new Double(1000000.00), 400},
+            {"Sell", "Ccy Spot", "A1", "AUD", new Double(343575.0), "EUR", new Double(250000.0), 11990},
+            {"Buy", "Ccy Spot", "A1", "EUR", new Double(100000.00), "JPY", new Double(1099000.00), 259},
+            {"Sell", "Ccy Fwd", "A3", "DKK", new Double(74889.00), "EUR", new Double(10000.00), 115439},};
+
+    public void interactiveAlternateRowGrouping() {
+        JXTable table = new JXTable(data, columnNames);
+        HighlightPredicate predicate =  new HighlightPredicate() {
+
+            @Override
+            public boolean isHighlighted(Component renderer,
+                    ComponentAdapter adapter) {
+                if (adapter.row == 0) return false;
+                return isOddValue(adapter);
+            }
+
+            private boolean isOddValue(ComponentAdapter adapter) {
+                Object previous = adapter.getFilteredValueAt(0, 7);
+                boolean odd = false;
+                for (int i = 1; i <= adapter.row; i++) {
+                    Object current = adapter.getFilteredValueAt(i, 7);
+                    if (!previous.equals(current)) {
+                        odd = !odd;
+                    }
+                    previous = current;
+                }
+                return odd;
+            }
+            
+        };
+        table.addHighlighter(new UIColorHighlighter(predicate));
+        showWithScrollingInFrame(table, "value-grouped alternate striping");
+    }    
+    
+    
+    public void interactiveAlternateRowGroupingRobSecond() {
+        JTable table = new JTable(data, columnNames) {
+
+            @Override
+            public Component prepareRenderer(TableCellRenderer renderer,
+                    int row, int column) {
+                Component c = super.prepareRenderer(renderer, row, column);
+                if (!isRowSelected(row)) {
+                    c.setBackground(getRowBackground(row));
+                }
+
+                return c;
+            }
+
+            private Color getRowBackground(int row) {
+                boolean isDark = true;
+
+                Object previous = getValueAt(0, 7);
+
+                for (int i = 1; i <= row; i++) {
+                    Object current = getValueAt(i, 7);
+
+                    if (!current.equals(previous)) {
+                        isDark = !isDark;
+                        previous = current;
+                    }
+                }
+
+                return isDark ? Color.ORANGE : Color.YELLOW;
+            }
+
+        };
+        table.setAutoCreateRowSorter(true);
+        showWithScrollingInFrame(table,
+                "Rob: value-grouped striping, sort-robust");
+    }
+
+    public void interactiveAlternateRowGroupingRob() {
+        JTable table = new JTable(data, columnNames) {
+            private Map<Object, Color> rowColor = new HashMap<Object, Color>();
+
+            private Color nextColor = Color.ORANGE;
+
+            @Override
+            public Component prepareRenderer(TableCellRenderer renderer,
+                    int row, int column) {
+                Component c = super.prepareRenderer(renderer, row, column);
+
+                if (isRowSelected(row))
+                    return c;
+
+                Object value = getValueAt(row, 7);
+                Color background = rowColor.get(value);
+
+                if (background != null) {
+                    c.setBackground(background);
+                } else {
+                    rowColor.put(value, nextColor);
+                    c.setBackground(nextColor);
+                    nextColor = (nextColor == Color.ORANGE) ? Color.YELLOW
+                            : Color.ORANGE;
+                }
+
+                return c;
+            }
+
+        };
+        table.setAutoCreateRowSorter(true);
+        showWithScrollingInFrame(table, "Rob: value-grouped striping");
+    }
+    
+    public void interactiveOptionalAlternateRowBackground() {
+        final Color original = UIManager.getColor("Table.alternateRowColor");
+        final JXTable table = new JXTable(new AncientSwingTeam());
+        JXFrame frame = wrapWithScrollingInFrame(table, "toggle handle alternateRow");
+        Action toggle = new AbstractAction("toggle alternate row as default visual") {
+            boolean isHandling;
+            
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                isHandling = !isHandling;
+                UIManager.put(TableCellContext.HANDLE_ALTERNATE_ROW_BACKGROUND, isHandling);
+                if (UIManager.getColor("Table.alternateRowColor") == null) {
+                    UIManager.put("Table.alternateRowColor", HighlighterFactory.FLORAL_WHITE);
+                }
+                table.repaint();
+            }
+        };
+        addAction(frame, toggle);
+        
+        Action cleanup = new AbstractAction("cleanup alternateRowHandling") {
+            
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                UIManager.put(TableCellContext.HANDLE_ALTERNATE_ROW_BACKGROUND, false);
+                UIManager.put("Table.alternateRowColor", original);
+                table.repaint();
+            }
+        };
+        addAction(frame, cleanup);
+        show(frame);
+    }
+
+    
+    public void interactiveIconTextAlignmentAndExtendsOpacity() {
+        ListModel files = createFileListModel();
+        final JXList list = new JXList(files);
+        ComponentProvider<?> text = new LabelProvider(StringValues.FILE_NAME, JLabel.TRAILING);
+        final WrappingProvider wrapper = new WrappingProvider(IconValues.FILE_ICON, text, true);
+        wrapper.setExtendsComponentOpacity(true);
+        list.setCellRenderer(new DefaultListRenderer(wrapper));
+        list.addHighlighter(HighlighterFactory.createSimpleStriping());
+        JXFrame frame =showWithScrollingInFrame(list, "alignment in wrappingProvider");
+        Action action = new AbstractAction("toggle icon opacity") {
+            
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                wrapper.setExtendsComponentOpacity(!wrapper.getExtendsComponentOpacity());
+                list.repaint();
+            }
+        };
+        addAction(frame, action);
+        JLabel label = new JLabel(IconValues.FILE_ICON.getIcon(list.getElementAt(1)));
+        addStatusComponent(frame, label);
+    }
+    
+    
+    public void interactiveTreeNodeCustomIcons() {
+        ListModel files = createFileListModel();
+        
+        JXList table = new JXList(files);
+        StringValue sv = new StringValue() {
+
+            @Override
+            public String getString(Object value) {
+                if (value instanceof File) {
+                    return FileSystemView.getFileSystemView().getSystemDisplayName((File) value)
+                       + " Type: " 
+                       + FileSystemView.getFileSystemView().getSystemTypeDescription((File) value); 
+                } 
+                return StringValues.TO_STRING.getString(value);
+            }
+            
+        };
+        IconValue iv = IconValues.FILE_ICON;
+        table.setCellRenderer(new DefaultListRenderer(new MappedValue(sv, iv)));
+        final JXTree tree = new JXTree(createFileNodeModel());
+        final DefaultTreeRenderer treeRenderer = new DefaultTreeRenderer(iv, sv);
+        
+        tree.setCellRenderer(treeRenderer);
+        
+        String folderDescription = ".*ordner.*";
+        PatternPredicate predicate = new PatternPredicate(folderDescription, 0, -1);
+        Highlighter hl = new ColorHighlighter(predicate, null, Color.RED);
+        table.addHighlighter(hl);
+        tree.addHighlighter(hl);
+        Calendar calendar = Calendar.getInstance();
+        calendar.add(Calendar.YEAR, -1);
+        final Date lastYear = calendar.getTime();
+        
+        final HighlightPredicate valueBased = new HighlightPredicate() {
+
+            @Override
+            public boolean isHighlighted(Component renderer,
+                    ComponentAdapter adapter) {
+                if (!(adapter.getValue() instanceof File)) return false;
+                File file = (File) adapter.getValue();
+                Date date = new Date(file.lastModified());
+                return date.after(lastYear);
+            }
+            
+        };
+        final ColorHighlighter back =  new ColorHighlighter(valueBased, Color.YELLOW, null);
+        table.addHighlighter(back);
+        tree.addHighlighter(back);
+        tree.setRolloverEnabled(true);
+        tree.addHighlighter(new BorderHighlighter(HighlightPredicate.ROLLOVER_ROW, 
+                BorderFactory.createLineBorder(Color.BLUE)));
+        final HighlightPredicate valueBasedUnwrap = new HighlightPredicate() {
+
+            @Override
+            public boolean isHighlighted(Component renderer,
+                    ComponentAdapter adapter) {
+                File file = getUserObject(adapter.getValue());
+                if (file == null) return false;
+                Date date = new Date(file.lastModified());
+                return date.after(lastYear);
+            }
+
+            private File getUserObject(Object value) {
+                if (value instanceof File) return (File) value;
+                if (value instanceof DefaultMutableTreeNode) {
+                    return getUserObject(((DefaultMutableTreeNode) value).getUserObject());
+                }
+                if (value instanceof TreeTableNode) {
+                    return getUserObject(((TreeTableNode) value).getUserObject());
+                }
+                return null;
+            }
+
+            
+        };
+        JXFrame frame = showWithScrollingInFrame(tree, table, "Tree/List: same string/icon values ");
+        Action toggleUnwrap = new AbstractAction("toggle unwrapUserObject") {
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                WrappingProvider provider = (WrappingProvider) treeRenderer.getComponentProvider();
+                provider.setUnwrapUserObject(!provider.getUnwrapUserObject());
+                tree.revalidate();
+                tree.repaint();
+            }
+            
+        };
+        addAction(frame, toggleUnwrap);
+        Action togglePredicate = new AbstractAction("toggle predicateUnwrap") {
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                HighlightPredicate old = back.getHighlightPredicate();
+                back.setHighlightPredicate(old == valueBased ? valueBasedUnwrap : valueBased);
+            }
+            
+        };
+        addAction(frame, togglePredicate);
+        Action toggleLargeModel = new AbstractAction("toggle largeModel") {
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                tree.setLargeModel(!tree.isLargeModel());
+                tree.revalidate();
+                tree.repaint();
+            }
+            
+        };
+        addAction(frame, toggleLargeModel);
+        addStatusMessage(frame, "node is treeNode wrapping file - string/value based Highlighters differ");
+        
+    }
+   
+    
+    
+    private TreeModel createFileNodeModel() {
+        FileSystemModel tree = new FileSystemModel();
+        File root = tree.getRoot();
+        DefaultMutableTreeNode rootNode = new DefaultMutableTreeNode(root);
+        for (int i = 0; i < tree.getChildCount(root); i++) {
+            rootNode.add(new DefaultMutableTreeNode(tree.getChild(root, i)));
+        }
+        
+        return new DefaultTreeModel(rootNode);
+    }
+
+    
+    private ListModel createFileListModel() {
+        FileSystemModel tree = new FileSystemModel();
+        DefaultListModel list = new DefaultListModel();
+        File root = tree.getRoot();
+        list.addElement(root);
+        for (int i = 0; i < tree.getChildCount(root); i++) {
+            list.addElement(tree.getChild(root, i));
+        }
+        return list;
+    }
+
+    
+    public void interactiveTreeTableCustomIcons() {
+        
+        TreeTableModel model = new FileSystemModel() {
+            
+            @Override
+            public Object getValueAt(Object node, int column) {
+                if (column == 0) {
+                    return node;
+                }
+                return super.getValueAt(node, column);
+            }
+            
+        };
+        JXTreeTable table = new JXTreeTable(model);
+        StringValue sv = new StringValue() {
+
+            @Override
+            public String getString(Object value) {
+                if (value instanceof File) {
+                    return FileSystemView.getFileSystemView().getSystemDisplayName((File) value)
+                       + " Type: " 
+                       + FileSystemView.getFileSystemView().getSystemTypeDescription((File) value)
+                    ; 
+                } 
+                return StringValues.TO_STRING.getString(value);
+            }
+            
+        };
+        IconValue iv = new IconValue() {
+
+            @Override
+            public Icon getIcon(Object value) {
+                if (value instanceof File) {
+                    return  FileSystemView.getFileSystemView().getSystemIcon((File) value);
+                } 
+                return null;
+            }};
+        final DefaultTreeRenderer treeRenderer = new DefaultTreeRenderer(iv, sv);
+        table.setTreeCellRenderer(treeRenderer);
+        final JXTree tree = new JXTree(model);
+        tree.setCellRenderer(treeRenderer);
+        tree.setRolloverEnabled(true);
+        tree.addHighlighter(new BorderHighlighter(HighlightPredicate.ROLLOVER_ROW, 
+                BorderFactory.createLineBorder(Color.BLUE)));
+        
+        String folderDescription = ".*ordner.*";
+        PatternPredicate predicate = new PatternPredicate(folderDescription, 0, -1);
+        Highlighter hl = new ColorHighlighter(predicate, null, Color.RED);
+        table.addHighlighter(hl);
+        tree.addHighlighter(hl);
+        Calendar calendar = Calendar.getInstance();
+        calendar.add(Calendar.YEAR, -1);
+        final Date lastYear = calendar.getTime();
+        
+        HighlightPredicate valueBased = new HighlightPredicate() {
+
+            @Override
+            public boolean isHighlighted(Component renderer,
+                    ComponentAdapter adapter) {
+                if (!(adapter.getValue() instanceof File)) return false;
+                File file = (File) adapter.getValue();
+                Date date = new Date(file.lastModified());
+                return date.after(lastYear);
+            }
+            
+        };
+        ColorHighlighter back =  new ColorHighlighter(valueBased, Color.YELLOW, null);
+        table.addHighlighter(back);
+        tree.addHighlighter(back);
+        JXFrame frame =showWithScrollingInFrame(tree, table, "Tree/Table: same string/icon value");
+        addStatusMessage(frame, "node is File - string/value based highlighters same");
+    }
+    
+    
+    public void interactiveTableSQLDateTime() {
+        Date date = new Date();
+        java.sql.Date sqlDate = new java.sql.Date(date.getTime());
+        Timestamp stamp = new Timestamp(date.getTime());
+        Time time = new Time(date.getTime());
+        DefaultTableModel model = new DefaultTableModel(1, 5) {
+
+            @Override
+            public Class<?> getColumnClass(int columnIndex) {
+                if (getRowCount() > 0) {
+                    Object value = getValueAt(0, columnIndex);
+                    if (value != null) {
+                        return value.getClass();
+                    }
+                }
+                return super.getColumnClass(columnIndex);
+            }
+            
+        };
+        model.setColumnIdentifiers(new Object[]{"Date - normal", "SQL Date", "SQL Timestamp", "SQL Time", "Date - as time"});
+        model.setValueAt(date, 0, 0);
+        model.setValueAt(sqlDate, 0, 1);
+        model.setValueAt(stamp, 0, 2);
+        model.setValueAt(time, 0, 3);
+        model.setValueAt(date, 0, 4);
+        JXTable table = new JXTable(model);
+        
+        DefaultTableRenderer renderer = new DefaultTableRenderer(
+                new LabelProvider(SwingConstants.RIGHT));
+        table.setDefaultRenderer(Timestamp.class, renderer);
+        table.setDefaultRenderer(Time.class, renderer);
+        table.setDefaultRenderer(java.sql.Date.class, renderer);
+        
+        table.getColumnExt(4).setCellRenderer(new DefaultTableRenderer(
+                new FormatStringValue(DateFormat.getTimeInstance(DateFormat.SHORT))));
+        showWithScrollingInFrame(table, "normal/sql date formatting"); 
+    }
+    
+    
+    public void interactiveTextAreaRendererTable() {
+        DefaultTableModel model = new DefaultTableModel(0, 2);
+        model.addRow(new String[]{"some really, maybe really really long text -  "
+                + "wrappit .... where needed ", "some really, maybe really really long text -  " +
+                "wrappit .... where needed "});
+        model.addRow(new String[]{"another really, maybe really really long text -  "
+                + "with nothing but junk. wrappit .... where needed", "some really, maybe really really long text -  " +
+                "wrappit .... where needed "});
+
+
+        JXTable table = new JXTable(model);
+        table.setColumnControlVisible(true);
+        table.setDefaultRenderer(Object.class, new DefaultTableRenderer(new TextAreaProvider()));
+        table.addHighlighter(HighlighterFactory.createSimpleStriping());
+        installDynamicRowHeights(table);
+        showWithScrollingInFrame(table, "textArea as rendering comp");
+    }
+
+    
+    private void installDynamicRowHeights(final JXTable table) {
+        updateRowHeight(table);
+        TableColumnModelListener columnListener = new TableColumnModelListener() {
+
+            @Override
+            public void columnAdded(TableColumnModelEvent e) {
+                updateRowHeight(table);
+            }
+
+            @Override
+            public void columnMarginChanged(ChangeEvent e) {
+                
+                
+                updateRowHeight(table);
+            }
+
+            @Override
+            public void columnMoved(TableColumnModelEvent e) {
+            }
+
+            @Override
+            public void columnRemoved(TableColumnModelEvent e) {
+                updateRowHeight(table);
+            }
+
+            @Override
+            public void columnSelectionChanged(ListSelectionEvent e) {
+            }
+            
+        };
+        table.getColumnModel().addColumnModelListener(columnListener);
+    }
+    
+    
+    private void updateRowHeight(final JXTable table) {
+        for (int row = 0; row < table.getRowCount(); row++) {
+            int rowHeight = 0;
+            for (int column = 0; column < table.getColumnCount(); column++) {
+                Component comp = table.prepareRenderer(table
+                        .getCellRenderer(row, column), row, column);
+                rowHeight = Math.max(rowHeight,
+                        comp.getPreferredSize().height);
+            }
+            table.setRowHeight(row, rowHeight); 
+        }
+    }
+
+        // TODO
+
+    
+    public static class TextAreaProvider extends ComponentProvider<JTextArea> {
+
+        @Override
+        protected void configureState(CellContext context) {
+            int columnWidth = getPreferredAreaWidth(context);
+            if (columnWidth > 0) {
+                rendererComponent.setSize(columnWidth, Short.MAX_VALUE);
+            }
+        }
+
+        
+        private int getPreferredAreaWidth(CellContext context) {
+            if (context.getComponent() instanceof JXTable) {
+                JXTable table = (JXTable) context.getComponent();
+                return table.getColumn(context.getColumn()).getWidth();
+            }
+            if (context.getComponent() instanceof JTree) {
+                
+            }
+            if (context.getComponent() != null) {
+                
+                
+                
+                
+                
+                return context.getComponent().getWidth();
+            }
+            
+            return -1;
+        }
+
+        @Override
+        protected JTextArea createRendererComponent() {
+            JTextArea area = new JTextArea();
+            area.setLineWrap(true);
+            area.setWrapStyleWord(true);
+            area.setOpaque(true);
+            return area;
+        }
+
+        @Override
+        protected void format(CellContext context) {
+            rendererComponent.setText(getValueAsString(context));
+        }
+        
+    }
+ 
+    
+    public void interactiveXLabelRenderer() {
+        DefaultTableModel model = new DefaultTableModel(0, 1);
+        model.addRow(new String[] {"some really, maybe really really long text -  "
+                + "wrappit .... where needed "});
+        model.addRow(new String[] {"another really, maybe really really long text -  "
+                + "with nothing but junk. wrappit .... where needed"});
+        JXTable table = new JXTable(model);
+        table.setVisibleRowCount(4);
+        table.setVisibleColumnCount(2);
+        table.setColumnControlVisible(true);
+        table.getColumnExt(0).setCellRenderer(new DefaultTableRenderer(new XLabelProvider()));
+        table.addHighlighter(
+                HighlighterFactory.createAlternateStriping());
+        table.setRowHeight(50);
+        showWithScrollingInFrame(table, "textArea as rendering comp");
+    }
+
+    
+    public static class XLabelProvider extends ComponentProvider<JXLabel> {
+
+        @Override
+        protected void configureState(CellContext context) {
+        }
+
+        @Override
+        protected JXLabel createRendererComponent() {
+            JXLabel label = new JXLabel();
+
+            label.setLineWrap(true);
+            return label;
+        }
+
+        @Override
+        protected void format(CellContext context) {
+            rendererComponent.setText(getValueAsString(context));
+        }
+        
+    }
+    
+    public void interactiveListDisabledIconRenderer() {
+        final TableModel model = createTableModelWithDefaultTypes();
+        
+        ListModel listModel = new AbstractListModel() {
+
+            @Override
+            public Object getElementAt(int index) {
+                if (index == 0) {
+                    return "dummy";
+                }
+                return model.getValueAt(index - 1, 4);
+            }
+
+            @Override
+            public int getSize() {
+                return model.getRowCount() + 1;
+            }
+            
+        };
+        final JList standard = new JList(listModel);
+        final JList enhanced = new JList(listModel);
+        enhanced.setCellRenderer(new DefaultListRenderer());
+
+        AbstractAction action = new AbstractAction("toggle disabled") {
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                standard.setEnabled(!standard.isEnabled());
+                enhanced.setEnabled(!enhanced.isEnabled());
+            }
+            
+        };
+        JXFrame frame = wrapWithScrollingInFrame(standard, enhanced, "Disabled - compare renderers: default <--> enhanced");
+        addAction(frame, action);
+        frame.setVisible(true);
+    }
+    
+    
+    public void interactiveTableDefaultRenderers() {
+        TableModel model = createTableModelWithDefaultTypes();
+        final JTable standard = new JTable(model);
+        
+        final JXTable xTable = new JXTable();
+        final JTable enhanced = new JTable(model) {
+
+            @Override
+            protected void createDefaultRenderers() {
+                defaultRenderersByColumnClass = new UIDefaults();
+                setDefaultRenderer(Object.class, xTable.getDefaultRenderer(Object.class));
+                setDefaultRenderer(Number.class, xTable.getDefaultRenderer(Number.class));
+                setDefaultRenderer(Date.class, xTable.getDefaultRenderer(Date.class));
+                setDefaultRenderer(Icon.class, xTable.getDefaultRenderer(Icon.class));
+                setDefaultRenderer(ImageIcon.class, xTable.getDefaultRenderer(ImageIcon.class));
+                setDefaultRenderer(Boolean.class, xTable.getDefaultRenderer(Boolean.class));
+            }
+            
+        };
+        AbstractAction action = new AbstractAction("toggle disabled") {
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                standard.setEnabled(!standard.isEnabled());
+                enhanced.setEnabled(!enhanced.isEnabled());
+            }
+            
+        };
+        JXFrame frame = wrapWithScrollingInFrame(standard, enhanced, "Disabled Compare renderers: default <--> enhanced");
+        addAction(frame, action);
+        frame.setVisible(true);
+    }
+    
+    
+    private TableModel createTableModelWithDefaultTypes() {
+        String[] names = {"Object", "Number", "Double", "Date", "ImageIcon", "Boolean", "URI"};
+        final Class<?>[] types = {Object.class, Number.class, Double.class, Date.class, ImageIcon.class, Boolean.class, URI.class};
+        DefaultTableModel model = new DefaultTableModel(names, 0) {
+
+            @Override
+            public Class<?> getColumnClass(int columnIndex) {
+                return types[columnIndex];
+            }
+
+            
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return getColumnClass(column) != URI.class;
+            }
+            
+            
+            
+        };
+        Date today = new Date();
+        Icon icon = XTestUtils.loadDefaultIcon();
+        for (int i = 0; i < 10; i++) {
+            Object[] values;
+            try {
+                values = new Object[] {"row " + i, i, Math.random() * 100, 
+                        new Date(today.getTime() + i * 1000000), icon, i % 2 == 0, new URI("http://swingx.java.net")};
+                model.addRow(values);
+            } catch (URISyntaxException e) {
+                
+                e.printStackTrace();
+            }
+        }
+        return model;
+    }
+
+    
+    @SuppressWarnings("deprecation")
+    public void interactiveTableCompareFocusedCellBackground() {
+        TableModel model = new AncientSwingTeam() {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return column != 0;
+            }
+        };
+        
+        JTable xtable = new JTable(model);
+        xtable.setBackground(HighlighterFactory.NOTEPAD); 
+        JTable table = new JTable(model);
+        table.setBackground(new Color(0xF5, 0xFF, 0xF5)); 
+        TableCellRenderer renderer = new DefaultTableRenderer();
+        table.setDefaultRenderer(Object.class, renderer);
+        JXFrame frame = wrapWithScrollingInFrame(xtable, table, "JTable: Unselected focused background: core/ext renderer");
+        addStatusComponent(frame, new JLabel("background for unselected lead: first column is not-editable"));    
+        show(frame);
+    }
+
+    
+    public void interactiveXTableCompareFocusedCellBackground() {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    }
+
+    
+    public void interactiveDisabledCollectionViews() {
+        final JXTable table = new JXTable(new AncientSwingTeam());
+
+        table.setEnabled(false);
+        final JXList list = new JXList(new String[] {"one", "two", "and something longer"});
+        list.setEnabled(false);
+
+        final JXTree tree = new JXTree(new FileSystemModel());
+        tree.setEnabled(false);
+        JComponent box = Box.createHorizontalBox();
+        box.add(new JScrollPane(table));
+        box.add(new JScrollPane(list));
+        box.add(new JScrollPane(tree));
+        JXFrame frame = wrapInFrame(box, "disabled collection views");
+        AbstractAction action = new AbstractAction("toggle disabled") {
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                table.setEnabled(!table.isEnabled());
+                list.setEnabled(!list.isEnabled());
+                tree.setEnabled(!tree.isEnabled());
+            }
+            
+        };
+        addAction(frame, action);
+        frame.setVisible(true);
+        
+    }
+
+    
+    public void interactiveTableAndListCustomRenderer() {
+        final ListModel players = createPlayerModel();
+        TableModel tableModel = new AbstractTableModel() {
+            String[] columnNames = {"Name", "Score", "Player.toString"};
+            @Override
+            public int getColumnCount() {
+                return 3;
+            }
+
+            @Override
+            public int getRowCount() {
+                return players.getSize();
+            }
+
+            @Override
+            public Object getValueAt(int rowIndex, int columnIndex) {
+                return players.getElementAt(rowIndex);
+            }
+
+            @Override
+            public Class<?> getColumnClass(int columnIndex) {
+                return Player.class;
+            }
+
+            @Override
+            public String getColumnName(int column) {
+                return columnNames[column];
+            }
+            
+            
+        };
+        JXTable xtable = new JXTable(tableModel);
+        PropertyStringValue converter = new PropertyStringValue("name");
+        LabelProvider nameController = new LabelProvider(converter);
+        xtable.getColumn(0).setCellRenderer(new DefaultTableRenderer(nameController));
+        PropertyStringValue scoreConverter = new PropertyStringValue("score");
+        xtable.getColumn(1).setCellRenderer(new DefaultTableRenderer(scoreConverter));
+        xtable.packAll();
+        JXList list = new JXList(players);
+        
+        list.setCellRenderer(new DefaultListRenderer(nameController));
+        showWithScrollingInFrame(xtable, list, "JXTable/JXList: Custom property renderer");
+
+    }
+
+  
+    public static class PropertyStringValue implements StringValue {
+        private String property;
+
+        public PropertyStringValue(String property) {
+            this.property = property;
+        }
+
+        
+        @Override
+        public String getString(Object value) {
+            try {
+                PropertyDescriptor desc = getPropertyDescriptor(value.getClass(), property);
+                return StringValues.TO_STRING.getString(getValue(value, desc));
+            } catch (Exception e) {
+                
+                
+            }
+            return "";
+        }
+        
+    }
+    
+    
+    public void interactiveTableCustomRenderer() {
+        JXTable table = new JXTable();
+        StringValue converter = new StringValue() {
+
+            @Override
+            public String getString(Object value) {
+                if (value instanceof Point) {
+                    Point p = (Point) value;
+                    return createString(p.x, p.y);
+                } else if (value instanceof Dimension) {
+                    Dimension dim = (Dimension) value;
+                    return createString(dim.width, dim.height);
+                }
+               return "";
+            }
+
+            private String createString(int width, int height) {
+                return "(" + width + ", " + height + ")";
+            }
+            
+        };
+        TableCellRenderer renderer = new DefaultTableRenderer(converter);
+        table.setDefaultRenderer(Point.class, renderer);
+        table.setDefaultRenderer(Dimension.class, renderer);
+        JXFrame frame = showWithScrollingInFrame(table, "custom renderer (from demo) for Point/Dimension");
+        ComponentTreeTableModel model = new ComponentTreeTableModel(frame);
+        JXTreeTable treeTable = new JXTreeTable(model);
+        treeTable.expandAll();
+        table.setModel(treeTable.getModel());
+        
+    }
+    
+
+    
+    public void interactiveTableURIRenderer() {
+        JXTable table = new JXTable(createTableModelWithURI());
+        JXFrame frame = wrapWithScrollingInFrame(table, "default renderer: URI");
+        addStatusMessage(frame, "Note: hyperlinks only clickable if !editable");
+        show(frame);
+    }
+    
+    public void interactiveTestTableLinkRenderer() {
+        EditorPaneLinkVisitor visitor = new EditorPaneLinkVisitor();
+        JXTable table = new JXTable(createModelWithLinks());
+        LinkModelAction<LinkModel> action = new LinkModelAction<LinkModel>(visitor);
+        ComponentProvider<JXHyperlink> controller = new HyperlinkProvider(action, LinkModel.class);
+        table.setDefaultRenderer(LinkModel.class, new DefaultTableRenderer(controller));
+        JXFrame frame = wrapWithScrollingInFrame(table, visitor.getOutputComponent(), "show link renderer in table");
+        addStatusMessage(frame, "Note: hyperlinks only clickable if !editable");
+        frame.setVisible(true);
+
+    }
+    
+    public void interactiveListURIRenderer() {
+        JXList list = new JXList(createListModelWithURI(20));
+        list.setRolloverEnabled(true);
+        ComponentProvider<?> provider = new HyperlinkProvider(new HyperlinkAction());
+        list.setCellRenderer(new DefaultListRenderer(provider));
+        showWithScrollingInFrame(list, "list with uri renderer");
+    }
+    
+    public void interactiveTestListLinkRenderer() {
+        EditorPaneLinkVisitor visitor = new EditorPaneLinkVisitor();
+        JXList list = new JXList(createListModelWithLinks(20));
+        list.setRolloverEnabled(true);
+        LinkModelAction<LinkModel> action = new LinkModelAction<LinkModel>(visitor);
+        ComponentProvider<JXHyperlink> context = new HyperlinkProvider(action, LinkModel.class);
+        list.setCellRenderer(new DefaultListRenderer(context));
+        JFrame frame = wrapWithScrollingInFrame(list, visitor.getOutputComponent(), "show link renderer in list");
+        frame.setVisible(true);
+
+    }
+
+    public void interactiveTreeURIRenderer() {
+        JXTree tree = new JXTree(createTreeModelWithURI(20));
+        tree.setRolloverEnabled(true);
+        
+        ComponentProvider<?> provider = new HyperlinkProvider(new HyperlinkAction());
+        tree.setCellRenderer(new DefaultTreeRenderer(new WrappingProvider(provider)));
+        showWithScrollingInFrame(tree, "tree with uri renderer");
+    }
+    
+    public void interactiveTestTreeLinkRenderer() {
+        EditorPaneLinkVisitor visitor = new EditorPaneLinkVisitor();
+        JXTree tree = new JXTree(createTreeModelWithLinks(20));
+        tree.setRolloverEnabled(true);
+        LinkModelAction<LinkModel> action = new LinkModelAction<LinkModel>(visitor);
+        ComponentProvider<JXHyperlink> context = new HyperlinkProvider(action, LinkModel.class);
+        tree.setCellRenderer(new DefaultTreeRenderer(new WrappingProvider(context)));
+        JFrame frame = wrapWithScrollingInFrame(tree, visitor.getOutputComponent(), "show link renderer in list");
+        frame.setVisible(true);
+    }
+    
+
+    
+
+    
+    public void interactiveCheckListColumnControl() {
+        TableModel model = new AncientSwingTeam();
+        JXTable table = new JXTable(model);
+        table.setColumnControlVisible(true);
+        JXList list = new JXList();
+        
+        configureList(list, table, true);
+        StringValue sv = new StringValue() {
+
+            @Override
+            public String getString(Object value) {
+                if (value instanceof AbstractActionExt) {
+                    return ((AbstractActionExt) value).getName();
+                }
+                return StringValues.TO_STRING.getString(value);
+            }
+
+        };
+        BooleanValue bv = new BooleanValue() {
+
+            @Override
+            public boolean getBoolean(Object value) {
+                if (value instanceof AbstractActionExt) {
+                    return ((AbstractActionExt) value).isSelected();
+                }
+                return false;
+            }
+
+        };
+        CheckBoxProvider provider = new CheckBoxProvider(new MappedValue(sv,
+                null, bv), JLabel.LEADING);
+        list.setCellRenderer(new DefaultListRenderer(provider));
+        JXFrame frame = showWithScrollingInFrame(table, list,
+                "rollover checkbox list-renderer");
+        addComponentOrientationToggle(frame);
+        addStatusMessage(frame,
+                "CheckList renderer (not completely active - no hotspot, doubleclick only)");
+    }
+
+
+    
+    private void configureList(final JXList list, final JXTable table, boolean useRollover) {
+        final List<Action> actions = new ArrayList<Action>();
+        
+        @SuppressWarnings("all")
+        ColumnControlButton columnControl = new ColumnControlButton(table) {
+
+            @Override
+            protected void addVisibilityActionItems() {
+                actions.addAll(Collections
+                        .unmodifiableList(getColumnVisibilityActions()));
+            }
+
+        };
+        list.setModel(createListeningListModel(actions));
+        
+        final Action toggleSelected = new AbstractActionExt(
+                "toggle column visibility") {
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (list.isSelectionEmpty())
+                    return;
+                AbstractActionExt selectedItem = (AbstractActionExt) list
+                        .getSelectedValue();
+                selectedItem.setSelected(!selectedItem.isSelected());
+            }
+
+        };
+        if (useRollover) {
+            list.setRolloverEnabled(true);
+        } else {
+            
+            list.getInputMap().put(KeyStroke.getKeyStroke("SPACE"),
+                    "toggleSelectedActionState");
+        }
+        list.getActionMap().put("toggleSelectedActionState", toggleSelected);
+        
+        MouseAdapter adapter = new MouseAdapter() {
+
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2) {
+                    toggleSelected.actionPerformed(null);
+                }
+            }
+
+        };
+        list.addMouseListener(adapter);
+
+    }
+    
+    private ListModel createListeningListModel(final List<Action> actions) {
+        final DefaultListModel model = new DefaultListModel() {
+
+            DefaultListModel reallyThis = this;
+            @Override
+            public void addElement(Object obj) {
+                super.addElement(obj);
+                ((Action) obj).addPropertyChangeListener(l);
+                
+            }
+            
+            PropertyChangeListener l = new PropertyChangeListener() {
+                
+                @Override
+                public void propertyChange(PropertyChangeEvent evt) {
+                    int index = indexOf(evt.getSource());
+                    if (index >= 0) {
+                        fireContentsChanged(reallyThis, index, index);
+                    }
+                }
+                
+            };
+        };
+        for (Action action : actions) {
+            model.addElement(action);
+        }
+        return model;
+    }
+
+
+
+    
+    public void interactiveTableCustomColorRenderer() {
+        TableModel model = new AncientSwingTeam();
+        JXTable xtable = new JXTable(model);
+        xtable.setDefaultRenderer(Color.class, new ColorRenderer(true));
+        JXTable table = new JXTable(model);
+        TableCellRenderer renderer = createColorRendererExt();
+        table.setDefaultRenderer(Color.class, renderer);
+        showWithScrollingInFrame(xtable, table, "JXTable: Custom color renderer - standard/ext");
+    }
+
+    
+    public void interactiveTableCustomColorRendererWithHighlighter() {
+        TableModel model = new AncientSwingTeam();
+        JXTable xtable = new JXTable(model);
+        xtable.addHighlighter(
+                HighlighterFactory.createSimpleStriping(HighlighterFactory.GENERIC_GRAY));
+        xtable.setDefaultRenderer(Color.class, new ColorRenderer(true));
+        JXTable table = new JXTable(model);
+        table.addHighlighter(
+                HighlighterFactory.createSimpleStriping(HighlighterFactory.GENERIC_GRAY));
+        TableCellRenderer renderer = createColorRendererExt();
+        table.setDefaultRenderer(Color.class, renderer);
+        JXFrame frame = wrapWithScrollingInFrame(xtable, table, "JXTable/highlighter: Custom color renderer - standard/ext");
+        addStatusMessage(frame, "Highlighter hide custom color renderer background for unselected");
+        frame.setVisible(true);
+    }
+
+    
+    public void interactiveTableCustomColorRendererWithHighlighterDontTouch() {
+        TableModel model = new AncientSwingTeam();
+        JXTable xtable = new JXTable(model);
+        Highlighter highlighter = createPropertyRespectingHighlighter(
+                HighlighterFactory.createSimpleStriping(HighlighterFactory.GENERIC_GRAY));
+
+        xtable.addHighlighter(highlighter);
+        xtable.setDefaultRenderer(Color.class, new ColorRenderer(true));
+        JXTable table = new JXTable(model);
+        table.addHighlighter(highlighter);
+        TableCellRenderer renderer = createColorRendererExt();
+        table.setDefaultRenderer(Color.class, renderer);
+        JXFrame frame = wrapWithScrollingInFrame(xtable, table, "JXTable/highlighter dont-touch: Custom color renderer - standard/ext");
+        addStatusMessage(frame, "Highlighter doesn't touch custom color renderer visual properties");
+        frame.pack();
+        frame.setVisible(true);
+    }
+
+    
+    private Highlighter createPropertyRespectingHighlighter(final Highlighter delegate) {
+        HighlightPredicate predicate = new HighlightPredicate() {
+
+            @Override
+            public boolean isHighlighted(Component renderer, ComponentAdapter adapter) {
+                return ((JComponent) renderer).getClientProperty("renderer-dont-touch") == null;
+            }
+            
+        };
+        
+        Highlighter highlighter = new AbstractHighlighter(predicate) {
+
+            @Override
+            public Component doHighlight(Component renderer, ComponentAdapter adapter) {
+                return delegate.highlight(renderer, adapter);
+            }
+            
+        };
+        return highlighter;
+    }
+
+
+
+    
+    public void interactiveTableAndListCustomColorRenderingController() {
+        TableModel tableModel = new AncientSwingTeam();
+        ComponentProvider<JLabel> controller = createColorRenderingLabelController();
+        JXTable xtable = new JXTable(tableModel);
+        xtable.setDefaultRenderer(Color.class, new DefaultTableRenderer(controller));
+        ListModel model = createListColorModel();
+        JXList list = new JXList(model);
+        ListCellRenderer renderer = new DefaultListRenderer(controller);
+        list.setCellRenderer(renderer);
+        JXFrame frame = wrapWithScrollingInFrame(xtable, list, "JXTable/JXList: Custom color renderer - sharing the component controller");
+        addMessage(frame, "share provider in normally in different comps is okay?");
+        frame.pack();
+        frame.setVisible(true);
+    }
+
+    
+    public void interactiveTableAndTreeCustomColorRenderingController() {
+        TableModel tableModel = new AncientSwingTeam();
+        ComponentProvider<JLabel> controller = createColorRenderingLabelController();
+        JXTable xtable = new JXTable(tableModel);
+        xtable.setDefaultRenderer(Color.class, new DefaultTableRenderer(controller));
+        TreeModel model = createTreeColorModel();
+        JTree tree = new JTree(model);
+        ComponentProvider<?> wrapper = new WrappingProvider(controller); 
+        TreeCellRenderer renderer = new DefaultTreeRenderer(wrapper);
+        tree.setCellRenderer(renderer);
+        JXFrame frame = wrapWithScrollingInFrame(xtable, tree, "JXTable/JXTree: Custom color renderer - sharing the component controller");
+        addMessage(frame, "share provider in table and in wrappingProvider does not work?");
+        frame.pack();
+        frame.setVisible(true);
+    }
+
+    
+    protected TableCellRenderer createColorRendererExt() {
+        ComponentProvider<JLabel> context = createColorRenderingLabelController();
+        TableCellRenderer renderer = new DefaultTableRenderer(context);
+        return renderer;
+    }
+
+    
+    protected ListCellRenderer createListColorRendererExt() {
+        ComponentProvider<JLabel> context = createColorRenderingLabelController();
+        ListCellRenderer renderer = new DefaultListRenderer(context);
+        return renderer;
+    }
+
+    
+    private ComponentProvider<JLabel> createColorRenderingLabelController() {
+        ComponentProvider<JLabel> context = new LabelProvider() {
+            Border selectedBorder;
+            @Override
+            protected void format(CellContext context) {
+                super.format(context);
+                Object value = context.getValue();
+                if (value instanceof Color) {
+                    rendererComponent.setBackground((Color) value);
+                    rendererComponent.putClientProperty("renderer-dont-touch", "color");
+                } else {
+                    rendererComponent.putClientProperty("renderer-dont-touch", null);
+                }
+            }
+
+            
+            @Override
+            protected void configureState(CellContext context) {
+                Object value = context.getValue();
+                if (value instanceof Color) {
+                    Color newColor = (Color) value;
+                    rendererComponent.setToolTipText("RGB value: " + newColor.getRed() + ", "
+                            + newColor.getGreen() + ", " + newColor.getBlue());
+
+                } else {
+                    rendererComponent.setToolTipText(null);
+                }
+                if (context.isSelected()) {
+                    selectedBorder = BorderFactory.createMatteBorder(2, 5,
+                            2, 5, context.getSelectionBackground());
+                } else {
+                    selectedBorder = BorderFactory.createMatteBorder(2, 5,
+                            2, 5, context.getBackground());
+                }
+                rendererComponent.setBorder(selectedBorder);
+            }
+            
+        };
+        return context;
+    }
+
+    
+
+    
+    
+    private ListModel createListModelWithLinks(int count) {
+        DefaultListModel model = new DefaultListModel();
+        for (int i = 0; i < count; i++) {
+            LinkModel link = createLinkModel(i);
+            model.addElement(link);
+        }
+ 
+        return model;
+    }
+    
+    private TreeModel createTreeModelWithLinks(int count) {
+        DefaultMutableTreeNode root = new DefaultMutableTreeNode("Links");
+        for (int i = 0; i < count; i++) {
+            LinkModel link = createLinkModel(i);
+            root.add(new DefaultMutableTreeNode(link));
+        }
+        return new DefaultTreeModel(root);
+    }
+    
+    private TableModel createModelWithLinks() {
+        String[] columnNames = { "text only", "Link editable",
+                "Link not-editable", "Bool editable", "Bool not-editable" };
+
+        DefaultTableModel model = new DefaultTableModel(columnNames, 0) {
+
+            @Override
+            public Class<?> getColumnClass(int columnIndex) {
+                return getValueAt(0, columnIndex).getClass();
+            }
+
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return !getColumnName(column).contains("not");
+            }
+
+        };
+        for (int i = 0; i < 4; i++) {
+            LinkModel link = createLinkModel(i);
+            model.addRow(new Object[] { "text only " + i, link, link,
+                    Boolean.TRUE, Boolean.TRUE });
+        }
+        return model;
+    }
+
+    private LinkModel createLinkModel(int i) {
+        LinkModel link = null;
+        try {
+            link = new LinkModel("a link text " + i, null,
+                    new URL("http://some.dummy.url" + i));
+        } catch (MalformedURLException e) {
+            
+            e.printStackTrace();
+        }
+        if (i == 1) {
+            URL url = JXEditorPaneTest.class
+                    .getResource("resources/test.html");
+
+            link = new LinkModel("a link text " + i, null, url);
+        }
+        return link;
+    }
+    
+    private ListModel createListModelWithURI(int count) {
+        DefaultListModel model = new DefaultListModel();
+        for (int i = 0; i < count; i++) {
+            model.addElement(createURI(i));
+        }
+        return model;
+    }
+    
+    private TreeModel createTreeModelWithURI(int count) {
+        DefaultMutableTreeNode root = new DefaultMutableTreeNode(null);
+        for (int i = 0; i < count; i++) {
+            root.add(new DefaultMutableTreeNode(createURI(i)));
+        }
+        
+        return new DefaultTreeModel(root );
+    }
+    
+    private TableModel createTableModelWithURI() {
+        String[] columnNames = { "text only", "URI editable",
+                "URI not-editable", "Bool editable", "Bool not-editable" };
+
+        DefaultTableModel model = new DefaultTableModel(columnNames, 0) {
+
+            @Override
+            public Class<?> getColumnClass(int columnIndex) {
+                return getValueAt(0, columnIndex).getClass();
+            }
+
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return !getColumnName(column).contains("not");
+            }
+
+        };
+        for (int i = 0; i < 4; i++) {
+            URI link = createURI(i);
+            model.addRow(new Object[] { "text only " + i, link, link,
+                    Boolean.TRUE, Boolean.TRUE });
+        }
+        return model;
+    }
+
+    private URI createURI(int i) {
+        URI link = null;
+        try {
+            link = new URI("http://some.dummy.url" + i);
+        } catch (URISyntaxException e) {
+            
+            e.printStackTrace();
+        }
+        if (i == 1) {
+            URL url = JXEditorPaneTest.class
+                    .getResource("resources/test.html");
+
+            try {
+                link = url.toURI();
+            } catch (URISyntaxException e) {
+                
+                e.printStackTrace();
+            }
+        }
+        return link;
+    }
+    
+    private ListModel createListColorModel() {
+        AncientSwingTeam tableModel = new AncientSwingTeam();
+        int colorColumn = 2;
+        DefaultListModel model = new DefaultListModel();
+        for (int i = 0; i < tableModel.getRowCount(); i++) {
+            model.addElement(tableModel.getValueAt(i, colorColumn));
+        }
+        return model;
+    }
+
+    
+    private TreeModel createTreeColorModel() {
+        final AncientSwingTeam tableModel = new AncientSwingTeam();
+        final int colorColumn = 2;
+        DefaultMutableTreeNode root = new DefaultMutableTreeNode("Colors");
+        for (int row = 0; row < tableModel.getRowCount(); row++) {
+            root.add(new DefaultMutableTreeNode(tableModel.getValueAt(row, colorColumn)));
+        }
+        return new DefaultTreeModel(root);
+        
+    }
+
+    
+    public static class ColorRenderer extends JLabel implements
+            TableCellRenderer {
+        Border unselectedBorder = null;
+
+        Border selectedBorder = null;
+
+        boolean isBordered = true;
+
+        public ColorRenderer(boolean isBordered) {
+            this.isBordered = isBordered;
+            setOpaque(true); 
+            putClientProperty("renderer-dont-touch", "color");
+        }
+
+        @Override
+        public Component getTableCellRendererComponent(JTable table,
+                Object color, boolean isSelected, boolean hasFocus, int row,
+                int column) {
+            Color newColor = (Color) color;
+            setBackground(newColor);
+            if (isBordered) {
+                if (isSelected) {
+                    if (selectedBorder == null) {
+                        selectedBorder = BorderFactory.createMatteBorder(2, 5,
+                                2, 5, table.getSelectionBackground());
+                    }
+                    setBorder(selectedBorder);
+                } else {
+                    if (unselectedBorder == null) {
+                        unselectedBorder = BorderFactory.createMatteBorder(2,
+                                5, 2, 5, table.getBackground());
+                    }
+                    setBorder(unselectedBorder);
+                }
+            }
+
+            setToolTipText("RGB value: " + newColor.getRed() + ", "
+                    + newColor.getGreen() + ", " + newColor.getBlue());
+            return this;
+        }
+    }   
+    
+    public static class Player {
+        String name;
+        int score;
+        public Player(String name, int score) {
+            this.name = name;
+            this.score = score;
+        }
+        @Override
+        public String toString() {
+            return name + " has score: " + score;
+        }
+        public String getName() {
+            return name;
+        }
+        public int getScore() {
+            return score;
+        }
+        
+        
+    }
+
+    
+    private ListModel createPlayerModel() {
+        DefaultListModel model = new DefaultListModel();
+        model.addElement(new Player("Henry", 10));
+        model.addElement(new Player("Berta", 112));
+        model.addElement(new Player("Dave", 20));
+        return model;
+    }
+
+    
+    
+    public static PropertyDescriptor getPropertyDescriptor(
+        Class<?> beanClass,
+        String propertyName)
+        throws IntrospectionException {
+
+        BeanInfo info = Introspector.getBeanInfo(beanClass);
+        PropertyDescriptor[] descriptors = info.getPropertyDescriptors();
+        for (int i = 0; i < descriptors.length; i++) {
+            if (propertyName.equals(descriptors[i].getName()))
+                return descriptors[i];
+        }
+        throw new IntrospectionException(
+            "Property '" + propertyName + "' not found in bean " + beanClass);
+    }
+
+    
+    public static Object getValue(Object bean, PropertyDescriptor propertyDescriptor) {
+        if (bean == null)
+            throw new NullPointerException("The bean must not be null.");
+        
+        Method getter = propertyDescriptor.getReadMethod();
+        if (getter == null) {
+            throw new UnsupportedOperationException(
+                "The property '" + propertyDescriptor.getName() + "' is write-only.");
+        }
+        
+        try {
+            return getter.invoke(bean);
+        } catch (Exception e) {
+            throw new RuntimeException("can't access property: " + propertyDescriptor.getName());
+        }
+
+
+
+
+
+
+
+
+
+    }    
+    
+    
+    public void testDummy() {
+        
+    }
+
+}

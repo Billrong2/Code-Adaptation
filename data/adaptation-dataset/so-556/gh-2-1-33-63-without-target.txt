@@ -1,0 +1,29 @@
+package edu.cornell.opencomm.view;
+
+import edu.cornell.opencomm.model.ConferenceUser;
+import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffXfermode;
+import android.graphics.Rect;
+import android.util.TypedValue;
+
+
+
+public class UserView_v2 {
+
+	
+	
+	
+	
+	private Context context;
+	
+	
+	private ConferenceUser conferenceUser;
+
+	
+	// TODO
+
+}

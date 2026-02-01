@@ -1,0 +1,21 @@
+package com.crazyhitty.chdev.ks.munch.utils;
+
+import android.graphics.Rect;
+import android.support.v7.widget.RecyclerView;
+import android.view.View;
+
+
+public class ItemDecorationUtil extends RecyclerView.ItemDecoration {
+    private int mSpanCount;
+    private int mSpacing;
+    private boolean mIncludeEdge;
+
+    public ItemDecorationUtil(int mSpanCount, int mSpacing, boolean mIncludeEdge) {
+        this.mSpanCount = mSpanCount;
+        this.mSpacing = mSpacing;
+        this.mIncludeEdge = mIncludeEdge;
+    }
+
+    // TODO
+
+}

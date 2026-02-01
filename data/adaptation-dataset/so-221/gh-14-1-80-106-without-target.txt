@@ -1,0 +1,90 @@
+
+
+package com.vimeo.networking.utils;
+
+import com.google.gson.FieldNamingPolicy;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.vimeo.stag.generated.Stag;
+
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
+
+import okhttp3.CacheControl;
+import retrofit2.Call;
+import retrofit2.converter.gson.GsonConverterFactory;
+
+
+public class VimeoNetworkUtil {
+
+    private static Gson mGson;
+
+    
+    public static Gson getGson() {
+        if (mGson == null) {
+            mGson = getGsonBuilder().create();
+        }
+        return mGson;
+    }
+
+    
+    public static GsonBuilder getGsonBuilder() {
+        
+        return new GsonBuilder().registerTypeAdapterFactory(new Stag.Factory())
+                .setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES);
+    }
+
+        // TODO
+
+
+    
+
+    public static CacheControl.Builder getCacheControlBuilder(CacheControl cacheControl) {
+        CacheControl.Builder builder = new CacheControl.Builder();
+        if (cacheControl.maxAgeSeconds() > -1) {
+            builder.maxAge(cacheControl.maxAgeSeconds(), TimeUnit.SECONDS);
+        }
+        if (cacheControl.maxStaleSeconds() > -1) {
+            builder.maxStale(cacheControl.maxStaleSeconds(), TimeUnit.SECONDS);
+        }
+        if (cacheControl.minFreshSeconds() > -1) {
+            builder.minFresh(cacheControl.minFreshSeconds(), TimeUnit.SECONDS);
+        }
+
+        if (cacheControl.noCache()) {
+            builder.noCache();
+        }
+        if (cacheControl.noStore()) {
+            builder.noStore();
+        }
+        if (cacheControl.noTransform()) {
+            builder.noTransform();
+        }
+        if (cacheControl.onlyIfCached()) {
+            builder.onlyIfCached();
+        }
+        return builder;
+    }
+
+    
+    public static void cancelCalls(final ArrayList<Call> callsToCancel) {
+        final List<Call> callList = new CopyOnWriteArrayList<>(callsToCancel);
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                for (Call call : callList) {
+                    if (call != null) {
+                        call.cancel();
+                    }
+                }
+            }
+        }).start();
+    }
+}

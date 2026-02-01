@@ -1,0 +1,21 @@
+
+
+package com.icafe4j.image.color;
+
+import java.awt.Transparency;
+import java.awt.color.ColorSpace;
+import java.awt.image.ComponentColorModel;
+import java.awt.image.DataBuffer;
+
+
+
+
+public class Int32ComponentColorModel extends ComponentColorModel {
+	
+	public Int32ComponentColorModel(ColorSpace cs, boolean alpha) {
+		super(cs, alpha, false, alpha ? Transparency.TRANSLUCENT : Transparency.OPAQUE, DataBuffer.TYPE_INT);
+	}
+
+	// TODO
+
+}

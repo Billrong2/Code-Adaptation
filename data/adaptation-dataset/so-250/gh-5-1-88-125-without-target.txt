@@ -1,0 +1,65 @@
+package gr.uoa.di.android.helpers.net;
+
+import android.annotation.TargetApi;
+import android.content.Context;
+import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
+import android.os.Build;
+
+import org.apache.http.conn.util.InetAddressUtils;
+
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.SocketException;
+import java.util.Collections;
+import java.util.List;
+
+
+public final class Addresses {
+
+	private Addresses() {}
+
+	
+	public static String getCurrentSsid(Context ctx) {
+		String ssid = null;
+		if (Net.isWifiConnected(ctx)) {
+			WifiManager wm = (WifiManager) ctx
+				.getSystemService(Context.WIFI_SERVICE);
+			final WifiInfo connectionInfo = wm.getConnectionInfo();
+			if (connectionInfo != null) {
+				ssid = connectionInfo.getSSID();
+				if (ssid != null && "".equals(ssid.trim())) ssid = null;
+			}
+		}
+		return ssid;
+	}
+
+	
+	public static String getIPAddress(boolean useIPv4) throws SocketException {
+		List<NetworkInterface> interfaces = Collections.list(NetworkInterface
+			.getNetworkInterfaces());
+		for (NetworkInterface intf : interfaces) {
+			List<InetAddress> addrs = Collections.list(intf.getInetAddresses());
+			for (InetAddress addr : addrs) {
+				if (!addr.isLoopbackAddress()) {
+					String sAddr = addr.getHostAddress();
+					boolean isIPv4 = InetAddressUtils.isIPv4Address(sAddr);
+					if (useIPv4) {
+						if (isIPv4) return sAddr;
+					} else {
+						if (!isIPv4) {
+							
+							int delim = sAddr.indexOf('%');
+							return delim < 0 ? sAddr : sAddr
+								.substring(0, delim);
+						}
+					}
+				}
+			}
+		}
+		return "";
+	}
+
+		// TODO
+
+}

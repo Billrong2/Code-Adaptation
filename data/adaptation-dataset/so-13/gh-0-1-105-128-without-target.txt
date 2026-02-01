@@ -1,0 +1,178 @@
+
+
+
+package eu.geopaparazzi.library.sensors;
+
+import android.app.Activity;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
+import android.view.Display;
+import android.view.Surface;
+import android.view.WindowManager;
+
+import eu.geopaparazzi.library.database.GPLog;
+
+
+public class OrientationSensor implements SensorEventListener {
+
+    public final static int SENSOR_UNAVAILABLE = -1;
+
+    
+    private SensorManager sensorManager;
+    private SensorEventListener m_parent;
+    private Activity parentActivity;            
+
+    
+    private float m_Norm_Gravity;           
+    private float[] m_NormGravityVector;    
+    private float m_Norm_MagField;          
+    private float[] m_NormMagFieldValues;   
+
+    
+    private int m_GravityAccuracy;          
+    private int m_MagneticFieldAccuracy;    
+
+    
+    private float[] m_NormEastVector;       
+    private float[] m_NormNorthVector;      
+    private boolean m_OrientationOK;        
+    private float m_azimuth_radians;        
+    private float m_pitch_radians;          
+    private float m_pitch_axis_radians;     
+
+
+    
+    public OrientationSensor(SensorManager sensorManager, SensorEventListener parent) {
+        this.sensorManager = sensorManager;
+        m_parent = parent;
+        parentActivity = null;
+        m_NormGravityVector = m_NormMagFieldValues = null;
+        m_NormEastVector = new float[3];
+        m_NormNorthVector = new float[3];
+        m_OrientationOK = false;
+    }
+
+    public float getAzimuthDegrees() {
+        float azimuth = (float) Math.toDegrees(m_azimuth_radians);
+        if (azimuth < 0) {
+            azimuth = 360 + azimuth;
+        }
+        return azimuth;
+    }
+
+    // TODO
+
+
+    public void unregister() {
+        parentActivity = null;
+        m_NormGravityVector = m_NormMagFieldValues = null;
+        m_OrientationOK = false;
+        sensorManager.unregisterListener(this);
+    }
+
+    @Override
+    public void onSensorChanged(SensorEvent evnt) {
+        try {
+            if (parentActivity != null) {
+                int sensorType = evnt.sensor.getType();
+                switch (sensorType) {
+                    case Sensor.TYPE_GRAVITY:
+                        if (m_NormGravityVector == null) m_NormGravityVector = new float[3];
+                        System.arraycopy(evnt.values, 0, m_NormGravityVector, 0, m_NormGravityVector.length);
+                        m_Norm_Gravity = (float) Math.sqrt(m_NormGravityVector[0] * m_NormGravityVector[0] + m_NormGravityVector[1] * m_NormGravityVector[1] + m_NormGravityVector[2] * m_NormGravityVector[2]);
+                        for (int i = 0; i < m_NormGravityVector.length; i++)
+                            m_NormGravityVector[i] /= m_Norm_Gravity;
+                        break;
+                    case Sensor.TYPE_MAGNETIC_FIELD:
+                        if (m_NormMagFieldValues == null) m_NormMagFieldValues = new float[3];
+                        System.arraycopy(evnt.values, 0, m_NormMagFieldValues, 0, m_NormMagFieldValues.length);
+                        m_Norm_MagField = (float) Math.sqrt(m_NormMagFieldValues[0] * m_NormMagFieldValues[0] + m_NormMagFieldValues[1] * m_NormMagFieldValues[1] + m_NormMagFieldValues[2] * m_NormMagFieldValues[2]);
+                        for (int i = 0; i < m_NormMagFieldValues.length; i++)
+                            m_NormMagFieldValues[i] /= m_Norm_MagField;
+                        break;
+                }
+                if (m_NormGravityVector != null && m_NormMagFieldValues != null) {
+                    
+                    float East_x = m_NormMagFieldValues[1] * m_NormGravityVector[2] - m_NormMagFieldValues[2] * m_NormGravityVector[1];
+                    float East_y = m_NormMagFieldValues[2] * m_NormGravityVector[0] - m_NormMagFieldValues[0] * m_NormGravityVector[2];
+                    float East_z = m_NormMagFieldValues[0] * m_NormGravityVector[1] - m_NormMagFieldValues[1] * m_NormGravityVector[0];
+                    float norm_East = (float) Math.sqrt(East_x * East_x + East_y * East_y + East_z * East_z);
+                    if (m_Norm_Gravity * m_Norm_MagField * norm_East < 0.1f) {  
+                        m_OrientationOK = false; 
+                    } else {
+                        m_NormEastVector[0] = East_x / norm_East;
+                        m_NormEastVector[1] = East_y / norm_East;
+                        m_NormEastVector[2] = East_z / norm_East;
+
+                        
+                        float M_dot_G = (m_NormGravityVector[0] * m_NormMagFieldValues[0] + m_NormGravityVector[1] * m_NormMagFieldValues[1] + m_NormGravityVector[2] * m_NormMagFieldValues[2]);
+                        float North_x = m_NormMagFieldValues[0] - m_NormGravityVector[0] * M_dot_G;
+                        float North_y = m_NormMagFieldValues[1] - m_NormGravityVector[1] * M_dot_G;
+                        float North_z = m_NormMagFieldValues[2] - m_NormGravityVector[2] * M_dot_G;
+                        float norm_North = (float) Math.sqrt(North_x * North_x + North_y * North_y + North_z * North_z);
+                        m_NormNorthVector[0] = North_x / norm_North;
+                        m_NormNorthVector[1] = North_y / norm_North;
+                        m_NormNorthVector[2] = North_z / norm_North;
+
+                        
+                        float screen_adjustment = 0;
+                        WindowManager windowManager = parentActivity.getWindowManager();
+                        if (windowManager != null) {
+                            Display defaultDisplay = windowManager.getDefaultDisplay();
+                            if (defaultDisplay != null) {
+                                int rotation = defaultDisplay.getRotation();
+                                switch (rotation) {
+                                    case Surface.ROTATION_0:
+                                        screen_adjustment = 0;
+                                        break;
+                                    case Surface.ROTATION_90:
+                                        screen_adjustment = (float) Math.PI / 2;
+                                        break;
+                                    case Surface.ROTATION_180:
+                                        screen_adjustment = (float) Math.PI;
+                                        break;
+                                    case Surface.ROTATION_270:
+                                        screen_adjustment = 3 * (float) Math.PI / 2;
+                                        break;
+                                }
+                            }
+                        }
+                        
+
+                        
+                        
+                        float sin = m_NormEastVector[1] - m_NormNorthVector[0], cos = m_NormEastVector[0] + m_NormNorthVector[1];
+                        m_azimuth_radians = (float) (sin != 0 && cos != 0 ? Math.atan2(sin, cos) : 0);
+                        m_pitch_radians = (float) Math.acos(m_NormGravityVector[2]);
+                        sin = -m_NormEastVector[1] - m_NormNorthVector[0];
+                        cos = m_NormEastVector[0] - m_NormNorthVector[1];
+                        float aximuth_plus_two_pitch_axis_radians = (float) (sin != 0 && cos != 0 ? Math.atan2(sin, cos) : 0);
+                        m_pitch_axis_radians = (float) (aximuth_plus_two_pitch_axis_radians - m_azimuth_radians) / 2;
+                        m_azimuth_radians += screen_adjustment;
+                        m_pitch_axis_radians += screen_adjustment;
+                        m_OrientationOK = true;
+                    }
+                }
+                if (m_parent != null) m_parent.onSensorChanged(evnt);
+            }
+        } catch (Exception e) {
+            GPLog.error(this, null, e);
+        }
+    }
+
+    @Override
+    public void onAccuracyChanged(Sensor sensor, int accuracy) {
+        int SensorType = sensor.getType();
+        switch (SensorType) {
+            case Sensor.TYPE_GRAVITY:
+                m_GravityAccuracy = accuracy;
+                break;
+            case Sensor.TYPE_MAGNETIC_FIELD:
+                m_MagneticFieldAccuracy = accuracy;
+                break;
+        }
+        if (m_parent != null) m_parent.onAccuracyChanged(sensor, accuracy);
+    }
+}

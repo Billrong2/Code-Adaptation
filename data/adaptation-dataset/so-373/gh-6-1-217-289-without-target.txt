@@ -1,0 +1,195 @@
+
+package org.terracotta.management.model.cluster;
+
+import org.terracotta.management.model.Objects;
+
+import javax.xml.bind.DatatypeConverter;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.io.Serializable;
+import java.lang.management.ManagementFactory;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.UnknownHostException;
+import java.util.Enumeration;
+import java.util.UUID;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+
+public final class ClientIdentifier implements Serializable {
+
+  private static final long serialVersionUID = 1;
+
+  private static final Logger LOGGER = Logger.getLogger(ClientIdentifier.class.getName());
+
+  private final long pid;
+  private final String name;
+  private final String connectionUid;
+  private final String hostAddress;
+
+  private ClientIdentifier(long pid, String hostAddress, String name, String connectionUid) {
+    this.hostAddress = Objects.requireNonNull(hostAddress);
+    this.pid = pid;
+    this.connectionUid = Objects.requireNonNull(connectionUid);
+    this.name = Objects.requireNonNull(name);
+    if (hostAddress.isEmpty()) {
+      throw new IllegalArgumentException("Empty host address");
+    }
+    if (name.isEmpty()) {
+      throw new IllegalArgumentException("Empty name");
+    }
+  }
+
+  public String getConnectionUid() {
+    return connectionUid;
+  }
+
+  public String getHostAddress() {
+    return hostAddress;
+  }
+
+  public long getPid() {
+    return pid;
+  }
+
+  public String getName() {
+    return name;
+  }
+
+  public String getVmId() {
+    return pid + "@" + hostAddress;
+  }
+
+  public String getClientId() {
+    return getVmId() + ":" + name + ":" + connectionUid;
+  }
+
+  @Override
+  public String toString() {
+    return getClientId();
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) return true;
+    if (o == null || getClass() != o.getClass()) return false;
+    ClientIdentifier that = (ClientIdentifier) o;
+    return pid == that.pid
+        && name.equals(that.name)
+        && connectionUid.equals(that.connectionUid)
+        && hostAddress.equals(that.hostAddress);
+  }
+
+  @Override
+  public int hashCode() {
+    int result = (int) (pid ^ (pid >>> 32));
+    result = 31 * result + name.hashCode();
+    result = 31 * result + connectionUid.hashCode();
+    result = 31 * result + hostAddress.hashCode();
+    return result;
+  }
+
+  public static ClientIdentifier create(long pid, String hostAddress, String name, String uuid) {
+    return new ClientIdentifier(pid, hostAddress, name, uuid);
+  }
+
+  public static ClientIdentifier create(String name, String logicalConnectionUid) {
+    try {
+      InetAddress inetAddress = discoverLANAddress();
+      return new ClientIdentifier(discoverPID(), inetAddress.getHostAddress(), name, logicalConnectionUid);
+    } catch (UnknownHostException e) {
+      return new ClientIdentifier(discoverPID(), "127.0.0.1", name, logicalConnectionUid);
+    }
+
+  }
+
+  public static ClientIdentifier valueOf(String identifier) {
+    try {
+      int copy = identifier.indexOf('@');
+      int firstColon = identifier.indexOf(':', copy + 1);
+      int lastColon = identifier.lastIndexOf(':');
+      return new ClientIdentifier(
+          Long.parseLong(identifier.substring(0, copy)),
+          identifier.substring(copy + 1, firstColon),
+          identifier.substring(firstColon + 1, lastColon),
+          identifier.substring(lastColon + 1));
+    } catch (RuntimeException e) {
+      throw new IllegalArgumentException(identifier);
+    }
+  }
+
+  static String discoverHostName() {
+    String hostname = null;
+
+    try {
+      String procname = "hostname";
+      if (System.getProperty("os.name", "").toLowerCase().contains("win")) {
+        procname += ".exe";
+      }
+      Process process = Runtime.getRuntime().exec(procname);
+      if (process.waitFor() == 0) {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        InputStream in = process.getInputStream();
+        int r;
+        while ((r = in.read()) != -1) {
+          baos.write(r);
+        }
+        in.close();
+        hostname = new String(baos.toByteArray(), "UTF-8");
+      }
+    } catch (Exception e) {
+      
+      if (LOGGER.isLoggable(Level.FINEST)) {
+        LOGGER.log(Level.FINEST, "ERR getHostName(): " + e.getMessage(), e);
+      }
+    }
+
+    if (hostname != null) {
+      return hostname;
+    }
+
+    try {
+      InetAddress address = discoverLANAddress();
+      String resolved = address.getCanonicalHostName();
+      if (!address.getHostAddress().equals(resolved)) {
+        
+        hostname = resolved;
+      }
+    } catch (Exception ignored) {
+    }
+
+    return hostname;
+  }
+
+  static String generateNewUUID() {
+    UUID j = UUID.randomUUID();
+    byte[] data = new byte[16];
+    long msb = j.getMostSignificantBits();
+    long lsb = j.getLeastSignificantBits();
+    for (int i = 0; i < 8; i++) {
+      data[i] = (byte) (msb & 0xff);
+      msb >>>= 8;
+    }
+    for (int i = 8; i < 16; i++) {
+      data[i] = (byte) (lsb & 0xff);
+      lsb >>>= 8;
+    }
+    return DatatypeConverter.printBase64Binary(data)
+        
+        
+        .replace('+', '-').replace('/', '_').replace("=", "");
+  }
+
+  static long discoverPID() {
+    String name = ManagementFactory.getRuntimeMXBean().getName();
+    long pid = 0;
+    for (int i = 0; i < name.length() && Character.isDigit(name.charAt(i)); i++) {
+      pid = pid * 10 + Character.getNumericValue(name.charAt(i));
+    }
+    return pid;
+  }
+
+    // TODO
+
+}

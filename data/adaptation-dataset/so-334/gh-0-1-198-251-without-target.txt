@@ -1,0 +1,232 @@
+package org.geogebra.desktop.sound;
+
+import java.awt.Point;
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.net.URL;
+
+import javax.sound.sampled.AudioFormat;
+import javax.sound.sampled.AudioInputStream;
+import javax.sound.sampled.AudioSystem;
+import javax.sound.sampled.DataLine;
+import javax.sound.sampled.SourceDataLine;
+import javax.swing.SwingUtilities;
+
+import org.geogebra.common.kernel.geos.GeoFunction;
+import org.geogebra.common.sound.SoundManager;
+import org.geogebra.common.util.debug.Log;
+import org.geogebra.desktop.main.AppD;
+import org.geogebra.desktop.sound.mp3transform.Decoder;
+
+import javafx.application.Platform;
+import javafx.embed.swing.JFXPanel;
+import javafx.scene.media.Media;
+import javafx.scene.media.MediaPlayer;
+
+
+public class SoundManagerD implements SoundManager {
+
+	private AppD app;
+	private MidiSoundD midiSound;
+	private FunctionSoundD functionSound;
+
+	private static final int SOUNDTYPE_NONE = -1;
+	private static final int SOUNDTYPE_MIDI = 0;
+	private static final int SOUNDTYPE_FUNCTION = 1;
+	int currentSoundType = SOUNDTYPE_NONE;
+
+	private boolean isRunning = false;
+	private boolean isPaused = false;
+
+	
+	public SoundManagerD(AppD app) {
+		this.app = app;
+	}
+
+	
+	
+	
+
+	public boolean isRunning() {
+		return isRunning;
+	}
+
+	public boolean isPaused() {
+		return isPaused;
+	}
+
+	
+	MidiSoundD getMidiSound() {
+		if (midiSound == null)
+			try {
+				midiSound = new MidiSoundD(app);
+			} catch (Exception e) {
+				
+				e.printStackTrace();
+			}
+		return midiSound;
+	}
+
+	
+	private FunctionSoundD getFunctionSound() {
+		if (functionSound == null)
+			try {
+				functionSound = new FunctionSoundD(app);
+			} catch (Exception e) {
+				Log.error("Problem in getFunctionSound(): " + e.getMessage());
+			}
+		return functionSound;
+	}
+
+	
+	
+	
+
+	
+	public void playSequenceNote(final int note, final double duration,
+			final int instrument, final int velocity) {
+		try {
+			stopCurrentSound();
+			currentSoundType = SOUNDTYPE_MIDI;
+			getMidiSound().playSequenceNote(note, duration, instrument,
+					velocity);
+		} catch (Exception e) {
+			
+			e.printStackTrace();
+		}
+	}
+
+	
+	Decoder decoder;
+
+	
+	public void playFile(final String fileName) {
+
+
+
+		SwingUtilities.invokeLater(new Runnable() {
+			public void run() {
+
+				try {
+					if (fileName.startsWith("#") || !(fileName.endsWith(".midi")
+							&& fileName.endsWith(".mid"))) {
+
+						InputStream is;
+
+						if (fileName.startsWith("#")) {
+							
+							String id = fileName.substring(1);
+
+							String url = app.getURLforID(id);
+
+							
+							is = new URL(url)
+									.openStream();
+
+						} else if (fileName.startsWith("http:")
+								|| fileName.startsWith("https:")) {
+
+							is = new URL(fileName).openStream();
+
+						} else {
+							
+							
+							
+							is = new FileInputStream(fileName);
+
+						}
+
+						if (decoder == null) {
+							decoder = new Decoder();
+						}
+
+						Thread thread = new Thread(
+								new PlayMP3Thread(decoder, fileName, is));
+						thread.start();
+
+						return;
+
+					}
+
+					
+					stopCurrentSound();
+					currentSoundType = SOUNDTYPE_MIDI;
+					getMidiSound().playMidiFile(fileName);
+
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+
+			}
+		});
+
+
+
+
+
+	}
+
+		// TODO
+
+
+	
+	public void playSequenceFromString(String noteString, int instrument) {
+		try {
+			stopCurrentSound();
+			currentSoundType = SOUNDTYPE_MIDI;
+			getMidiSound().playSequenceFromJFugueString(noteString, instrument);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	
+	public void playFunction(final GeoFunction f, final double min,
+			final double max, final int sampleRate, final int bitDepth) {
+		try {
+			stopCurrentSound();
+			currentSoundType = SOUNDTYPE_FUNCTION;
+			getFunctionSound().playFunction(f, min, max, sampleRate, bitDepth);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	
+	public void playFunction(final GeoFunction f, final double min,
+			final double max) {
+		try {
+			stopCurrentSound();
+			currentSoundType = SOUNDTYPE_FUNCTION;
+			getFunctionSound().playFunction(f, min, max);
+		} catch (Exception e) {
+			Log.error("Problem in playFunction(): " + e.getMessage());
+		}
+	}
+
+	
+	
+	
+
+	
+	public void stopCurrentSound() {
+		if (midiSound != null)
+			midiSound.stop();
+		if (functionSound != null)
+			functionSound.pause(true);
+	}
+
+	
+	public void pauseResumeSound(boolean doResume) {
+
+		if (currentSoundType == SOUNDTYPE_MIDI && midiSound != null) {
+			midiSound.pause(!doResume);
+		}
+
+		if (currentSoundType == SOUNDTYPE_FUNCTION && functionSound != null)
+			functionSound.pause(!doResume);
+
+		isPaused = !doResume;
+	}
+
+}

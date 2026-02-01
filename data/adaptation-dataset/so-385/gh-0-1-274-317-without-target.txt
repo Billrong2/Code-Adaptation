@@ -1,0 +1,400 @@
+
+
+package us.fibernet.fiberj;
+
+import java.io.File;
+import java.io.InputStream;
+import java.io.DataInputStream;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.BufferedReader;
+
+import java.io.IOException;
+
+import java.awt.image.BufferedImage;
+import java.awt.image.DataBufferByte;
+import java.awt.image.DataBufferInt;
+import java.awt.image.Raster;
+import java.awt.image.RenderedImage;
+
+import javax.imageio.ImageIO;
+
+import com.sun.media.jai.codec.SeekableStream;
+import com.sun.media.jai.codec.FileSeekableStream;
+import com.sun.media.jai.codec.TIFFDecodeParam;
+import com.sun.media.jai.codec.ImageDecoder;
+import com.sun.media.jai.codec.ImageCodec;
+
+
+@SuppressWarnings("restriction")
+public final class PatternReader {
+
+    private static int[][] image;
+
+    private PatternReader() {
+    }
+
+    
+    public static Pattern readPattern(String[] args) {
+
+        if(args == null || args.length < 1) {
+            return null;
+        }
+
+        String fname = args[0];
+        int[][] data = null;
+        Pattern pattern = null;
+
+        if(args.length == 1) {
+            if(fname.toLowerCase().endsWith("tif")) {
+                data = readTif(fname);
+            }
+            else if(fname.toLowerCase().endsWith("plr")) {
+                data = readPlr(fname);
+            }
+            else if(fname.toLowerCase().endsWith("smv")) {
+                return PatternSmv.readSmvPattern(fname);
+            }
+            else {
+                data = readImage(fname);
+            }
+        }
+        else {
+            if(fname.toLowerCase().endsWith("dat")) {
+                int w = 0, h = 0;
+                try {
+                    w = Integer.parseInt(args[1]);
+                    h = Integer.parseInt(args[2]);
+                    data = readDat(fname, w, h);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    System.out.println("dat image width and height must be specified");
+                }
+            }
+        }
+
+
+        if(data != null) {
+            pattern = new Pattern(data, new File(fname).getName(), false);
+        }
+
+        return pattern;
+    }
+
+    
+    public static int[][] readPatternData(String[] args) {
+
+        if(args == null || args.length < 1) {
+            return null;
+        }
+
+        String fname = args[0];
+
+        if(args.length == 1) {
+            if(fname.toLowerCase().endsWith("tif")) {
+                return readTif(fname);
+            }
+            else if(fname.toLowerCase().endsWith("plr")) {
+                return readPlr(fname);
+            }
+            else if(fname.toLowerCase().endsWith("smv")) {
+                return PatternSmv.readSmv(fname);
+            }
+            else {
+                return readImage(fname);
+            }
+        }
+        else {
+            if(fname.toLowerCase().endsWith("dat")) {
+                int w = 0, h = 0;
+                try {
+                    w = Integer.parseInt(args[1]);
+                    h = Integer.parseInt(args[2]);
+                    return readDat(fname, w, h);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    System.out.println("dat image width and height must be specified");
+                }
+            }
+        }
+
+        return null;
+    }
+
+    
+    private static int[][] readDat(String fname, int width, int height) {
+
+        EndianCorrectInputStream input = null;
+        image = null;
+
+        try {
+
+            image = new int[height][width];
+            input = new EndianCorrectInputStream(new FileInputStream(fname), false);
+
+            for (int i = 0; i < height; i++) {
+                for (int j = 0; j < width; j++) {
+                    image[i][j] = (int) (input.readShortCorrect());
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            if(input != null) {
+                try {
+                    input.close();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+
+        return image;
+    }
+
+    
+    private static int[][] readTif(String fname) {
+
+        image = null;
+
+        try {
+            SeekableStream s = new FileSeekableStream(fname);
+            TIFFDecodeParam param = null;
+            ImageDecoder dec = ImageCodec.createImageDecoder("tiff", s, param);
+            RenderedImage op = dec.decodeAsRenderedImage(0);
+            Raster raster = op.getData();
+            image = new int[op.getHeight()][op.getWidth()];
+            
+
+            int[] pixelColor = new int[4];
+            for (int x = 0; x < op.getWidth(); x++) {
+                for (int y = 0; y < op.getHeight(); y++) {
+                    raster.getPixel(x, y, pixelColor);
+                    image[y][x] = pixelColor[0];
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return image;
+    }
+
+    
+    private static int[][] readImage(String fname) {
+
+        image = null;
+
+        try {
+
+            BufferedImage img = ImageIO.read(new File(fname));
+            int height = img.getHeight();
+            int width = img.getWidth();
+            
+
+            
+            byte[] pixels = ((DataBufferByte) img.getRaster().getDataBuffer()).getData();
+
+            image = new int[height][width];
+            int p = 0;
+            for(int h=0; h<height; h++) {
+                for(int w=0; w<width; w++) {
+                    image[h][w] = pixels[p++];
+                }
+            }
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return image;
+    }
+
+    
+
+        // TODO
+
+
+    
+    public static int[][] readPlr(String fname) {
+
+        try {
+            BufferedReader br = new BufferedReader(new FileReader(fname));
+            PatternPlr dp = new PatternPlr();
+            dp.parseData(br);
+            br.close();
+            return dp.getImageData();
+        }
+        catch(Exception e) {
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+
+
+    
+    static int[][] doubleToInt(double[][] array) {
+        int[][] output = new int[array.length][array[0].length];
+        for (int r = 0; r < array.length; r++) {
+            for (int c = 0; c < array[0].length; c++) {
+                output[r][c] = (int) array[r][c];
+            }
+        }
+        return output;
+    }
+
+} 
+
+
+
+
+
+class EndianCorrectInputStream extends DataInputStream {
+
+    private boolean bigendian = true;
+
+    public EndianCorrectInputStream(String filename, boolean be) throws FileNotFoundException {
+        super(new FileInputStream(filename));
+        bigendian = be;
+    }
+
+    public EndianCorrectInputStream(InputStream is, boolean be) {
+        super(is);
+        bigendian = be;
+    }
+
+    public short readShortCorrect() throws IOException {
+        short val;
+
+        val = readShort();
+        if(bigendian) {
+            return (val);
+        } else {
+            int byte0 = (int) val & 0xff;
+            int byte1 = ((int) val >> 8) & 0xff;
+            
+            return (short) ((byte0 << 8) | (byte1));
+        }
+    }
+
+    public short flipShort(short val) {
+
+        int byte0 = (int) val & 0xff;
+        int byte1 = ((int) val >> 8) & 0xff;
+        
+        return (short) ((byte0 << 8) | (byte1));
+    }
+
+    public int readIntCorrect() throws IOException {
+        int val;
+
+        val = readInt();
+        if(bigendian) {
+            return (val);
+        }
+
+        else {
+            int byte0 = val & 0xff;
+            int byte1 = (val >> 8) & 0xff;
+            int byte2 = (val >> 16) & 0xff;
+            int byte3 = (val >> 24) & 0xff;
+            
+            return (byte0 << 24) | (byte1 << 16) | (byte2 << 8) | byte3;
+        }
+    }
+
+    
+    public int flipInt(int val) {
+
+        int byte0 = val & 0xff;
+        int byte1 = (val >> 8) & 0xff;
+        int byte2 = (val >> 16) & 0xff;
+        int byte3 = (val >> 24) & 0xff;
+        
+        return (byte0 << 24) | (byte1 << 16) | (byte2 << 8) | byte3;
+    }
+
+    public long readLongCorrect() throws IOException {
+        long val;
+
+        val = readLong();
+        if(bigendian) {
+            return (val);
+        }
+
+        else {
+            return (flipLong(val));
+        }
+    }
+
+    
+    public long flipLong(long val) {
+
+        long byte0 = val & 0xff;
+        long byte1 = (val >> 8) & 0xff;
+        long byte2 = (val >> 16) & 0xff;
+        long byte3 = (val >> 24) & 0xff;
+        long byte4 = (val >> 32) & 0xff;
+        long byte5 = (val >> 40) & 0xff;
+        long byte6 = (val >> 48) & 0xff;
+        long byte7 = (val >> 56) & 0xff;
+        
+        return (long) ((byte0 << 56) | (byte1 << 48) | (byte2 << 40)
+                | (byte3 << 32) | (byte4 << 24) | (byte5 << 16) | (byte6 << 8) | byte7);
+    }
+
+    public float readFloatCorrect() throws IOException {
+        float val;
+
+        if(bigendian) {
+            val = readFloat();
+        }
+
+        else {
+            int x = readUnsignedByte();
+            x |= ((int) readUnsignedByte()) << 8;
+            x |= ((int) readUnsignedByte()) << 16;
+            x |= ((int) readUnsignedByte()) << 24;
+            val = (float) Float.intBitsToFloat(x);
+        }
+        return val;
+    }
+
+    
+    public float flipFloat(float val) throws IOException {
+
+        int x = Float.floatToIntBits(val);
+        int y = flipInt(x);
+        return Float.intBitsToFloat(y);
+    }
+
+    public double readDoubleCorrect() throws IOException {
+        double val;
+        if(bigendian) {
+            val = readDouble();
+        } else {
+            long x = readUnsignedByte();
+            x |= ((long) readUnsignedByte()) << 8;
+            x |= ((long) readUnsignedByte()) << 16;
+            x |= ((long) readUnsignedByte()) << 24;
+            x |= ((long) readUnsignedByte()) << 32;
+            x |= ((long) readUnsignedByte()) << 40;
+            x |= ((long) readUnsignedByte()) << 48;
+            x |= ((long) readUnsignedByte()) << 56;
+            val = Double.longBitsToDouble(x);
+        }
+        return val;
+    }
+
+    
+    public double flipDouble(double val) {
+
+        long x = Double.doubleToLongBits(val);
+        long y = flipLong(x);
+        return Double.longBitsToDouble(y);
+    }
+
+}
+

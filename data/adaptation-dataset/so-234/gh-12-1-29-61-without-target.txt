@@ -1,0 +1,13 @@
+
+package io.teknek.hiveunit;
+
+import java.lang.reflect.Field;
+import java.util.Collections;
+import java.util.Map;
+
+
+public class EnvironmentHack {
+
+  // TODO
+
+}

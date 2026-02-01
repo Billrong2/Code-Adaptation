@@ -1,0 +1,48 @@
+package edu.unc.utils;
+
+
+public class SortUtils {
+  
+  public static int[] sortIndices(float[] main) {
+    int[] index = new int[main.length];
+    for (int i = 0; i < index.length; i++) {
+      index[i] = i;
+    }
+
+    quicksort(main, index, 0, index.length - 1);
+
+    return index;
+  }
+
+  
+  public static int[] rank(float[] main) {
+    int[] sortedIndices = sortIndices(main);
+    int[] rank = new int[main.length];
+    for (int i = 0; i < rank.length; i++) {
+      rank[sortedIndices[i]] = i + 1;
+    }
+
+    return rank;
+  }
+
+  
+  private static void quicksort(float[] a, int[] index, int left, int right) {
+    if (right <= left) {
+      return;
+    }
+
+    int i = partition(a, index, left, right);
+    quicksort(a, index, left, i - 1);
+    quicksort(a, index, i + 1, right);
+  }
+
+    // TODO
+
+
+  
+  private static void swap(float[] a, int[] index, int i, int j) {
+    int tmp = index[i];
+    index[i] = index[j];
+    index[j] = tmp;
+  }
+}

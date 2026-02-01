@@ -1,0 +1,42 @@
+
+
+package org.andstatus.app.util;
+
+import android.content.Context;
+import android.util.DisplayMetrics;
+import android.view.MotionEvent;
+import android.view.View;
+import android.view.ViewConfiguration;
+
+
+public class ActivitySwipeDetector implements View.OnTouchListener {
+    private SwipeInterface activity;
+    private float downX, downY;
+    private long timeDown;
+    private final float minDistance;
+    private final int velocity;
+    private final float maxOffPath;
+
+    public ActivitySwipeDetector(Context context, SwipeInterface activity){
+        this.activity = activity;
+        final ViewConfiguration vc = ViewConfiguration.get(context);
+        DisplayMetrics dm = context.getResources().getDisplayMetrics();
+        minDistance = vc.getScaledPagingTouchSlop() * dm.density;
+        velocity = vc.getScaledMinimumFlingVelocity();
+        maxOffPath = minDistance * 2;            
+    }
+
+    public void onRightToLeftSwipe(View v){
+        MyLog.i(this, "RightToLeftSwipe!");
+        activity.onRightToLeft(v);
+    }
+
+    public void onLeftToRightSwipe(View v){
+        MyLog.i(this, "LeftToRightSwipe!");
+        activity.onLeftToRight(v);
+    }
+
+    // TODO
+
+
+}

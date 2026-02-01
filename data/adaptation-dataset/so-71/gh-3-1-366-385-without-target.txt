@@ -1,0 +1,330 @@
+
+package org.kuali.rice.krms.impl.repository.mock;
+
+import java.lang.reflect.InvocationTargetException;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Collection;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.regex.Pattern;
+import org.apache.commons.beanutils.NestedNullException;
+import org.apache.commons.beanutils.PropertyUtils;
+import org.joda.time.DateTime;
+import org.kuali.rice.core.api.criteria.AndPredicate;
+import org.kuali.rice.core.api.criteria.EqualPredicate;
+import org.kuali.rice.core.api.criteria.GreaterThanOrEqualPredicate;
+import org.kuali.rice.core.api.criteria.GreaterThanPredicate;
+import org.kuali.rice.core.api.criteria.LessThanOrEqualPredicate;
+import org.kuali.rice.core.api.criteria.LessThanPredicate;
+import org.kuali.rice.core.api.criteria.LikePredicate;
+import org.kuali.rice.core.api.criteria.OrPredicate;
+import org.kuali.rice.core.api.criteria.Predicate;
+import org.kuali.rice.core.api.criteria.QueryByCriteria;
+
+
+public class CriteriaMatcherInMemory<T> {
+
+    public CriteriaMatcherInMemory() {
+        super();
+    }
+    private QueryByCriteria criteria;
+
+    public QueryByCriteria getCriteria() {
+        return criteria;
+    }
+
+    public void setCriteria(QueryByCriteria criteria) {
+        this.criteria = criteria;
+    }
+
+    
+    public Collection<T> findMatching(Collection<T> all) {
+        
+        if (criteria == null) {
+            return all;
+        }
+        int count = -1;
+        int startAt = 0;
+        if (this.criteria.getStartAtIndex() != null) {
+            startAt = this.criteria.getStartAtIndex();
+        }
+        int maxResults = Integer.MAX_VALUE;
+        if (this.criteria.getMaxResults() != null) {
+            maxResults = this.criteria.getMaxResults();
+        }
+        List<T> selected = new ArrayList<T>();
+        for (T obj : all) {
+            if (matches(obj)) {
+                count++;
+                if (count < startAt) {
+                    continue;
+                }
+                selected.add(obj);
+                if (count > maxResults) {
+                    break;
+                }
+            }
+        }
+        return selected;
+    }
+
+    
+    public boolean matches(T infoObject) {
+        return matches(infoObject, this.criteria.getPredicate());
+    }
+
+    
+    protected boolean matches(T infoObject, Predicate predicate) {
+        
+        if (predicate == null) {
+            return true;
+        }
+        if (predicate instanceof OrPredicate) {
+            return matchesOr(infoObject, (OrPredicate) predicate);
+        }
+        if (predicate instanceof AndPredicate) {
+            return matchesAnd(infoObject, (AndPredicate) predicate);
+        }
+        if (predicate instanceof EqualPredicate) {
+            return matchesEqual(infoObject, (EqualPredicate) predicate);
+        }
+        if (predicate instanceof LessThanPredicate) {
+            return matchesLessThan(infoObject, (LessThanPredicate) predicate);
+        }
+        if (predicate instanceof LessThanOrEqualPredicate) {
+            return matchesLessThanOrEqual(infoObject, (LessThanOrEqualPredicate) predicate);
+        }
+        if (predicate instanceof GreaterThanPredicate) {
+            return matchesGreaterThan(infoObject, (GreaterThanPredicate) predicate);
+        }
+        if (predicate instanceof GreaterThanOrEqualPredicate) {
+            return matchesGreaterThanOrEqual(infoObject, (GreaterThanOrEqualPredicate) predicate);
+        }
+        if (predicate instanceof LikePredicate) {
+            return matchesLike(infoObject, (LikePredicate) predicate);
+        }
+        throw new UnsupportedOperationException("predicate type not supported yet in in-memory mathcer" + predicate.getClass().getName());
+    }
+
+    private boolean matchesOr(T infoObject, OrPredicate predicate) {
+        for (Predicate subPred : predicate.getPredicates()) {
+            if (matches(infoObject, subPred)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean matchesAnd(T infoObject, AndPredicate predicate) {
+        for (Predicate subPred : predicate.getPredicates()) {
+            if (!matches(infoObject, subPred)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean matchesEqual(T infoObject, EqualPredicate predicate) {
+        Object dataValue = extractValue(predicate.getPropertyPath(), infoObject);
+        return matchesEqual(dataValue, predicate.getValue().getValue());
+    }
+
+    private boolean matchesLessThan(T infoObject, LessThanPredicate predicate) {
+        Object dataValue = extractValue(predicate.getPropertyPath(), infoObject);
+        return matchesLessThan(dataValue, predicate.getValue().getValue());
+    }
+
+    private boolean matchesLessThanOrEqual(T infoObject, LessThanOrEqualPredicate predicate) {
+        Object dataValue = extractValue(predicate.getPropertyPath(), infoObject);
+        if (matchesLessThan(dataValue, predicate.getValue().getValue())) {
+            return true;
+        }
+        return matchesEqual(dataValue, predicate.getValue().getValue());
+    }
+
+    private boolean matchesGreaterThan(T infoObject, GreaterThanPredicate predicate) {
+        Object dataValue = extractValue(predicate.getPropertyPath(), infoObject);
+        return matchesGreaterThan(dataValue, predicate.getValue().getValue());
+    }
+
+    private boolean matchesGreaterThanOrEqual(T infoObject, GreaterThanOrEqualPredicate predicate) {
+        Object dataValue = extractValue(predicate.getPropertyPath(), infoObject);
+        if (matchesGreaterThan(dataValue, predicate.getValue().getValue())) {
+            return true;
+        }
+        return matchesEqual(dataValue, predicate.getValue().getValue());
+    }
+
+    private boolean matchesLike(T infoObject, LikePredicate predicate) {
+        Object dataValue = extractValue(predicate.getPropertyPath(), infoObject);
+        return matchesLike(dataValue, predicate.getValue().getValue());
+    }
+
+    protected static Object extractValue(String fieldPath, Object infoObject) {
+
+        try {
+            if (infoObject == null) {
+                return null;
+            }
+            Object value = PropertyUtils.getNestedProperty(infoObject, fieldPath);
+            
+            
+            
+            if (value instanceof Boolean) {
+                return value.toString();
+            }
+            
+            
+            
+            if (value instanceof Date) {
+                return new DateTime ((Date) value);
+            }
+            if (value instanceof Calendar) {
+                return new DateTime ((Calendar) value);
+            }
+            if (value instanceof Short) {
+                return BigInteger.valueOf(((Short) value).longValue());
+            }
+            if (value instanceof AtomicLong) {
+                return BigInteger.valueOf(((AtomicLong) value).longValue());
+            }
+            if (value instanceof AtomicInteger) {
+                return BigInteger.valueOf(((AtomicInteger) value).longValue());
+            }
+            if (value instanceof Integer) {
+                return BigInteger.valueOf(((Integer)value).longValue());
+            }
+            if (value instanceof Long) {
+                return BigInteger.valueOf(((Long)value).longValue());
+            }
+            if (value instanceof Float) {
+                return BigDecimal.valueOf(((Float)value).doubleValue());
+            }
+            if (value instanceof Double) {
+                return BigDecimal.valueOf(((Double)value).doubleValue());
+            }
+            return value;
+        } catch (NestedNullException ex) {
+            return null;
+        }  catch (IllegalAccessException ex) {
+            throw new IllegalArgumentException(fieldPath, ex);
+        } catch (InvocationTargetException ex) {
+            throw new IllegalArgumentException(fieldPath, ex);
+        } catch (NoSuchMethodException ex) {
+            throw new IllegalArgumentException(fieldPath, ex);
+        }
+
+
+    }
+
+    public static boolean matchesEqual(Object dataValue, Object criteriaValue) {
+        if (dataValue == criteriaValue) {
+            return true;
+        }
+        if (dataValue == null && criteriaValue == null) {
+            return true;
+        }
+        if (dataValue == null) {
+            return false;
+        }
+        return dataValue.equals(criteriaValue);
+    }
+
+    public static boolean matchesLessThan(Object dataValue, Object criteriaValue) {
+        if (dataValue == criteriaValue) {
+            return false;
+        }
+        if (dataValue == null && criteriaValue == null) {
+            return false;
+        }
+        if (dataValue == null) {
+            return false;
+        }
+        if (criteriaValue instanceof Comparable) {
+            Comparable comp1 = (Comparable) dataValue;
+            Comparable comp2 = (Comparable) criteriaValue;
+            if (comp1.compareTo(comp2) < 0) {
+                return true;
+            }
+            return false;
+        }
+        throw new IllegalArgumentException("The values are not comparable " + criteriaValue);
+    }
+
+    public static boolean matchesGreaterThan(Object dataValue, Object criteriaValue) {
+        if (dataValue == criteriaValue) {
+            return false;
+        }
+        if (dataValue == null && criteriaValue == null) {
+            return false;
+        }
+        if (dataValue == null) {
+            return false;
+        }
+        if (criteriaValue instanceof Comparable) {
+            Comparable comp1 = (Comparable) dataValue;
+            Comparable comp2 = (Comparable) criteriaValue;
+            if (comp1.compareTo(comp2) > 0) {
+                return true;
+            }
+            return false;
+        }
+        throw new IllegalArgumentException("The values are not comparable " + criteriaValue);
+    }
+    
+    private transient Map<String, Pattern> patternCache = new HashMap<String, Pattern>();
+
+    private Pattern getPattern(String expr) {
+        Pattern p = patternCache.get(expr);
+        if (p == null) {
+            p = compilePattern(expr);
+            patternCache.put(expr, p);
+        }
+        return p;
+    }
+
+    public boolean matchesLike(Object dataValue, Object criteriaValue) {
+        if (dataValue == criteriaValue) {
+            return false;
+        }
+        if (dataValue == null && criteriaValue == null) {
+            return false;
+        }
+        if (dataValue == null) {
+            return false;
+        }
+        return matchesLikeCachingPattern(dataValue.toString(), criteriaValue.toString());
+    }
+
+    
+    public boolean matchesLikeCachingPattern(final String str, final String expr) {
+        return matchesLike(str, getPattern(expr));
+    }
+
+    private static Pattern compilePattern(final String expr) {
+        String regex = quotemeta(expr);
+        regex = regex.replace("_", ".").replace("%", ".*?");
+        Pattern p = Pattern.compile(regex, Pattern.DOTALL);
+        return p;
+    }
+
+    
+    public static boolean matchesLike(final String str, final String expr) {
+        Pattern p = compilePattern(expr);
+        return matchesLike(str, p);
+    }
+
+    private static boolean matchesLike(final String str, final Pattern p) {
+        return p.matcher(str).matches();
+    }
+
+    // TODO
+
+}

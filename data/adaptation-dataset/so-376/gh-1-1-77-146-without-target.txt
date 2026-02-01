@@ -1,0 +1,80 @@
+package com.jme3x.jfx;
+
+import javafx.collections.ObservableList;
+import javafx.event.EventHandler;
+import javafx.event.EventType;
+import javafx.scene.Cursor;
+import javafx.scene.Node;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
+import javafx.scene.input.MouseEvent;
+import javafx.scene.layout.BorderPane;
+import javafx.stage.Stage;
+
+
+public class ResizeAndMoveHelper {
+
+	public static void addResizeListener(final Stage stage, final BorderPane menu) {
+		final ResizeListener resizeListener = new ResizeListener(stage, menu);
+		stage.getScene().addEventHandler(MouseEvent.MOUSE_MOVED, resizeListener);
+		stage.getScene().addEventHandler(MouseEvent.MOUSE_PRESSED, resizeListener);
+		stage.getScene().addEventHandler(MouseEvent.MOUSE_DRAGGED, resizeListener);
+		final ObservableList<Node> children = stage.getScene().getRoot().getChildrenUnmodifiable();
+		for (final Node child : children) {
+			ResizeAndMoveHelper.addListenerDeeply(child, resizeListener);
+		}
+	}
+
+	public static void addListenerDeeply(final Node node, final EventHandler<MouseEvent> listener) {
+		node.addEventHandler(MouseEvent.MOUSE_MOVED, listener);
+		node.addEventHandler(MouseEvent.MOUSE_PRESSED, listener);
+		node.addEventHandler(MouseEvent.MOUSE_DRAGGED, listener);
+		if (node instanceof Parent) {
+			final Parent parent = (Parent) node;
+			final ObservableList<Node> children = parent.getChildrenUnmodifiable();
+			for (final Node child : children) {
+				ResizeAndMoveHelper.addListenerDeeply(child, listener);
+			}
+		}
+	}
+
+	static class ResizeListener implements EventHandler<MouseEvent> {
+		private Stage		stage;
+		private Cursor		cursorEvent	= Cursor.DEFAULT;
+		private int			border		= 4;
+		private double		startX		= 0;
+		private double		startY		= 0;
+
+		protected double	dragDeltax;
+		protected double	dragDeltay;
+
+		protected boolean	resizing;
+
+		public ResizeListener(final Stage stage, final BorderPane menu) {
+			this.stage = stage;
+
+			menu.setOnMouseDragged(new EventHandler<MouseEvent>() {
+				@Override
+				public void handle(final MouseEvent mouseEvent) {
+					if (!ResizeListener.this.resizing) {
+						stage.setX(mouseEvent.getScreenX() + ResizeListener.this.dragDeltax);
+						stage.setY(mouseEvent.getScreenY() + ResizeListener.this.dragDeltay);
+					}
+				}
+			});
+
+			menu.setOnMousePressed(new EventHandler<MouseEvent>() {
+				@Override
+				public void handle(final MouseEvent mouseEvent) {
+					
+					ResizeListener.this.resizing = false;
+					ResizeListener.this.dragDeltax = stage.getX() - mouseEvent.getScreenX();
+					ResizeListener.this.dragDeltay = stage.getY() - mouseEvent.getScreenY();
+				}
+			});
+		}
+
+		// TODO
+
+	}
+}

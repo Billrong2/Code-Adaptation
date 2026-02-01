@@ -1,0 +1,116 @@
+
+package eu.musesproject.server.connectionmanager;
+
+
+
+
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+
+import javax.servlet.ServletInputStream;
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletRequest;
+
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
+
+public class Helper {
+	private static Logger logger = Logger.getLogger(Helper.class.getName());
+	private static final int COOKIE_MAX_AGE = 60*60*24; 
+	
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+	
+	public static Cookie extractCookie(HttpServletRequest req) {
+		Cookie retreivedCookie = null;
+		Cookie [] cookies = req.getCookies();
+		if (cookies != null ){
+			for (Cookie ck : cookies){
+				if (ck.getName().equals("JSESSIONID")) {
+					retreivedCookie = ck;
+					retreivedCookie.setMaxAge(COOKIE_MAX_AGE);
+				}
+			}
+		} else {
+			retreivedCookie = new Cookie("JSESSIONID", req.getSession().getId());
+			retreivedCookie.setMaxAge(COOKIE_MAX_AGE);
+			retreivedCookie.setPath(req.getContextPath());
+			logger.log(Level.INFO, "New Request cookie created");	
+		}
+		
+		return retreivedCookie;
+	}
+	
+		// TODO
+
+	
+	
+	public static void disconnect(HttpServletRequest request){
+		request.getSession().invalidate();
+	}
+	
+	
+	public static boolean isDisconnectRequest(String dataAttachedInCurrentReuqest){
+		if (dataAttachedInCurrentReuqest.equalsIgnoreCase("disconnect")){
+			return true; 
+		} 
+		return false;
+	}
+	
+	
+	
+	public static boolean isPollRequest(String dataAttachedInCurrentReuqest){
+		if (dataAttachedInCurrentReuqest.equalsIgnoreCase("poll")){
+			return true; 
+		} 
+		return false;
+	}
+	
+	public static boolean isConnectRequest(String dataAttachedInCurrentReuqest){
+		if (dataAttachedInCurrentReuqest.equalsIgnoreCase("connect")){
+			return true; 
+		} 
+		return false;
+	}
+	
+}

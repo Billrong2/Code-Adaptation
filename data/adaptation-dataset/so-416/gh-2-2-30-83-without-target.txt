@@ -1,0 +1,66 @@
+package org.usergrid.android.client.utils;
+
+import static org.usergrid.android.client.utils.ObjectUtils.isEmpty;
+
+import java.io.UnsupportedEncodingException;
+import java.util.UUID;
+
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.net.wifi.WifiManager;
+import android.os.Build;
+import android.provider.Settings.Secure;
+import android.telephony.TelephonyManager;
+
+
+public class DeviceUuidFactory {
+	protected static final String PREFS_FILE = "device_id.xml";
+	protected static final String PREFS_DEVICE_ID = "device_id";
+
+	protected static UUID uuid;
+
+	// TODO
+
+
+	private UUID generateDeviceUuid(Context context) {
+
+		
+		String buildParams = Build.BOARD + Build.BRAND + Build.CPU_ABI
+				+ Build.DEVICE + Build.DISPLAY + Build.FINGERPRINT + Build.HOST
+				+ Build.ID + Build.MANUFACTURER + Build.MODEL + Build.PRODUCT
+				+ Build.TAGS + Build.TYPE + Build.USER;
+
+		
+		TelephonyManager tm = (TelephonyManager) context
+				.getSystemService(Context.TELEPHONY_SERVICE);
+
+		
+		String imei = tm.getDeviceId();
+
+		
+		String androidId = Secure.getString(context.getContentResolver(),
+				Secure.ANDROID_ID);
+
+		
+		WifiManager wm = (WifiManager) context
+				.getSystemService(Context.WIFI_SERVICE);
+
+		
+		String mac = wm.getConnectionInfo().getMacAddress();
+
+		
+		if (isEmpty(imei) && isEmpty(androidId) && isEmpty(mac)) {
+			return UUID.randomUUID();
+		}
+
+		
+		String fullHash = buildParams.toString() + imei + androidId + mac;
+
+		return UUID.nameUUIDFromBytes(fullHash.getBytes());
+	}
+
+	
+	public UUID getDeviceUuid() {
+		return uuid;
+	}
+}

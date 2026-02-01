@@ -1,0 +1,52 @@
+
+
+package jp.co.cyberagent.jenkins.plugins;
+
+public class AndroidUtils {
+    
+    
+    private static int endDocTag = 0x00100101;
+    private static int startTag = 0x00100102;
+    private static int endTag = 0x00100103;
+
+    private static void prt(final String str) {
+        
+    }
+
+    // TODO
+
+
+    private static String compXmlString(final byte[] xml, final int sitOff, final int stOff,
+            final int strInd) {
+        if (strInd < 0) {
+            return null;
+        }
+        int strOff = stOff + LEW(xml, sitOff + strInd * 4);
+        return compXmlStringAt(xml, strOff);
+    }
+
+    private static String spaces = "                                             ";
+
+    private static void prtIndent(final int indent, final String str) {
+        prt(spaces.substring(0, Math.min(indent * 2, spaces.length())) + str);
+    }
+
+    
+    
+    
+    private static String compXmlStringAt(final byte[] arr, final int strOff) {
+        int strLen = arr[strOff + 1] << 8 & 0xff00 | arr[strOff] & 0xff;
+        byte[] chars = new byte[strLen];
+        for (int ii = 0; ii < strLen; ii++) {
+            chars[ii] = arr[strOff + 2 + ii * 2];
+        }
+        return new String(chars); 
+    } 
+
+    
+    
+    private static int LEW(final byte[] arr, final int off) {
+        return arr[off + 3] << 24 & 0xff000000 | arr[off + 2] << 16 & 0xff0000
+                | arr[off + 1] << 8 & 0xff00 | arr[off] & 0xFF;
+    } 
+}

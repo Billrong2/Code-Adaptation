@@ -1,0 +1,29 @@
+
+
+package org.odk.collect.android.utilities;
+
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.MatchResult;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+
+
+public class ReplaceCallback {
+    public interface Callback {
+        
+        String matchFound(MatchResult match);
+    }
+
+    
+    public static String replace(String pattern, String subject, Callback callback) {
+        return replace(pattern, subject, -1, null, callback);
+    }
+
+    public static String replace(String pattern, String subject, int limit, Callback callback) {
+        return replace(pattern, subject, limit, null, callback);
+    }
+
+        // TODO
+
+}

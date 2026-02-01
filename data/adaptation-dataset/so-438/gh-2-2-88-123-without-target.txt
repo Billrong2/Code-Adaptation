@@ -1,0 +1,100 @@
+package org.owasp.security.logging.util;
+
+import java.io.IOException;
+import java.io.OutputStream;
+
+import org.slf4j.Logger;
+
+
+public class OutputStreamRedirector extends OutputStream {
+
+	    protected Logger log;
+	    protected boolean isError;
+
+	    protected static final String LINE_SEPERATOR = System.getProperty("line.separator");
+	    
+	    
+	    protected boolean hasBeenClosed = false;
+
+	    
+	    protected byte[] buf;
+
+	    
+	    protected int count;
+
+	    
+	    private int bufLength;
+
+	    
+	    public static final int DEFAULT_BUFFER_LENGTH = 2048;
+
+	    private OutputStreamRedirector() {
+	        
+	    }
+
+	    
+	    public OutputStreamRedirector(Logger log, boolean isError) throws IllegalArgumentException {
+	        if (log == null) {
+	            throw new IllegalArgumentException("log == null");
+	        }
+
+	        this.isError = isError;
+	        this.log = log;
+	        bufLength = DEFAULT_BUFFER_LENGTH;
+	        buf = new byte[DEFAULT_BUFFER_LENGTH];
+	        count = 0;
+	    }
+
+	    
+	    @Override
+	    public void close() {
+	        flush();
+	        hasBeenClosed = true;
+	    }
+
+	    	    // TODO
+
+
+	    
+	    @Override
+	    public void flush() {
+
+	        if (count == 0) {
+	            return;
+	        }
+
+	        
+	        
+	        if (count == LINE_SEPERATOR.length()) {
+	            if (((char) buf[0]) == LINE_SEPERATOR.charAt(0) && ((count == 1) || 
+	                                                                                
+	                                                                                
+	                                                                                
+	                                                                                
+	                                                                                
+	                    ((count == 2) && ((char) buf[1]) == LINE_SEPERATOR.charAt(1)))) {
+	                reset();
+	                return;
+	            }
+	        }
+
+	        final byte[] theBytes = new byte[count];
+
+	        System.arraycopy(buf, 0, theBytes, 0, count);
+
+	        if (isError) {
+	            log.error(new String(theBytes));
+	        } else {
+	            log.info(new String(theBytes));
+	        }
+
+	        reset();
+	    }
+
+	    private void reset() {
+	        
+	        
+	        count = 0;
+	    }
+
+}

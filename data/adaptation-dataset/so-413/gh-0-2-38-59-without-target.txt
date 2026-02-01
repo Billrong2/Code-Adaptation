@@ -1,0 +1,36 @@
+package com.andrew.apolloMod.views;
+
+
+import android.content.Context;
+import android.graphics.Matrix;
+import android.util.AttributeSet;
+import android.widget.ImageView;
+
+
+
+public class TrackBrowserImageView extends ImageView {
+
+    public TrackBrowserImageView(Context context) {
+        super(context);
+        setup();
+    }
+
+    public TrackBrowserImageView(Context context, AttributeSet attrs) {
+        super(context, attrs);
+        setup();
+    }
+
+    public TrackBrowserImageView(Context context, AttributeSet attrs,
+            int defStyle) {
+        super(context, attrs, defStyle);
+        setup();
+    }
+
+    private void setup() {
+        setScaleType(ScaleType.MATRIX);
+    }
+
+    // TODO
+
+
+}

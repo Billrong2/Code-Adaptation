@@ -1,0 +1,33 @@
+package org.rapidoid.fluent.utils;
+
+import java.util.Iterator;
+import java.util.Optional;
+import java.util.Spliterator;
+import java.util.Spliterators;
+import java.util.stream.Stream;
+
+
+
+
+public class StreamUtils {
+
+		// TODO
+
+
+	private static <T> Iterator<T> traverse(Spliterator<T> sp) {
+		Spliterator<T> prev = sp.trySplit();
+
+		if (prev == null) {
+			return Spliterators.iterator(sp);
+		}
+
+		Iterator<T> it = traverse(sp);
+
+		if (it != null && it.hasNext()) {
+			return it;
+		}
+
+		return traverse(prev);
+	}
+
+}

@@ -1,0 +1,227 @@
+
+package com.jaspersoft.studio.utils;
+
+import java.util.Map;
+
+import org.eclipse.jface.fieldassist.ControlDecoration;
+import org.eclipse.jface.fieldassist.FieldDecoration;
+import org.eclipse.jface.fieldassist.FieldDecorationRegistry;
+import org.eclipse.jface.viewers.ColumnViewerEditor;
+import org.eclipse.jface.viewers.ColumnViewerEditorActivationEvent;
+import org.eclipse.jface.viewers.ColumnViewerEditorActivationStrategy;
+import org.eclipse.jface.viewers.DoubleClickEvent;
+import org.eclipse.jface.viewers.TableViewer;
+import org.eclipse.jface.viewers.TableViewerEditor;
+import org.eclipse.nebula.widgets.gallery.GalleryItem;
+import org.eclipse.swt.SWT;
+import org.eclipse.swt.events.ModifyEvent;
+import org.eclipse.swt.events.ModifyListener;
+import org.eclipse.swt.graphics.Drawable;
+import org.eclipse.swt.graphics.FontData;
+import org.eclipse.swt.graphics.FontMetrics;
+import org.eclipse.swt.graphics.GC;
+import org.eclipse.swt.graphics.Image;
+import org.eclipse.swt.layout.GridData;
+import org.eclipse.swt.layout.GridLayout;
+import org.eclipse.swt.layout.RowData;
+import org.eclipse.swt.layout.RowLayout;
+import org.eclipse.swt.widgets.Composite;
+import org.eclipse.swt.widgets.Control;
+import org.eclipse.swt.widgets.Event;
+import org.eclipse.swt.widgets.Label;
+import org.eclipse.swt.widgets.Listener;
+import org.eclipse.swt.widgets.Spinner;
+import org.eclipse.swt.widgets.Text;
+import org.eclipse.ui.PlatformUI;
+import org.eclipse.wb.swt.ResourceManager;
+import org.eclipse.wb.swt.SWTResourceManager;
+
+import com.jaspersoft.studio.swt.events.ExpressionModifiedEvent;
+import com.jaspersoft.studio.swt.events.ExpressionModifiedListener;
+import com.jaspersoft.studio.swt.widgets.WTextExpression;
+import com.jaspersoft.studio.utils.SWTImageEffects.Glow;
+
+public class UIUtil {
+	
+	public static final String PROPERTIES_VIEW_ID = "org.eclipse.ui.views.PropertySheet"; 
+
+	
+	public static void setSpinnerSelection(Spinner spinner, Object obj) {
+		if (obj == null)
+			return;
+		if (!(obj instanceof Integer))
+			return;
+		int num = ((Integer) obj).intValue();
+		if (spinner.getSelection() != num) {
+			spinner.setSelection(num);
+		}
+	}
+
+	
+	public static void setSpinnerSelection(Spinner spinner, Object obj, int defValue) {
+		int num = defValue;
+		if (obj != null && obj instanceof Integer) {
+			num = ((Integer) obj).intValue();
+		}
+
+		if (!spinner.isDisposed() && spinner.getSelection() != num) {
+			spinner.setSelection(num);
+		}
+	}
+
+	public static Label createLabel(Composite parent, String txt) {
+		return createLabel(parent, txt, -1);
+	}
+
+	public static Label createLabel(Composite parent, String txt, int span) {
+		Label lbl = new Label(parent, SWT.RIGHT);
+		lbl.setText(txt);
+		if (parent.getLayout() instanceof RowLayout) {
+			RowData rd = new RowData();
+			lbl.setLayoutData(rd);
+		} else if (parent.getLayout() instanceof GridLayout) {
+			GridData gd = new GridData(GridData.HORIZONTAL_ALIGN_END | GridData.VERTICAL_ALIGN_BEGINNING);
+			gd.verticalIndent = 5;
+			if (span > 0)
+				gd.horizontalSpan = span;
+			lbl.setLayoutData(gd);
+		}
+		return lbl;
+	}
+
+	public static Label createSeparator(Composite parent, int span) {
+		Label lbl = new Label(parent, SWT.SEPARATOR | SWT.HORIZONTAL | SWT.WRAP);
+		if (parent.getLayout() instanceof RowLayout) {
+			RowData rd = new RowData();
+			lbl.setLayoutData(rd);
+		} else if (parent.getLayout() instanceof GridLayout) {
+			GridData gd = new GridData(GridData.FILL_HORIZONTAL);
+			gd.horizontalSpan = span;
+			lbl.setLayoutData(gd);
+		}
+		return lbl;
+	}
+
+	public static void setBold(Control control) {
+		control.setFont(SWTResourceManager.getBoldFont(control.getFont()));
+	}
+
+	public static int getCharWidth(Drawable control) {
+		GC gc = new GC(control);
+		FontMetrics fm = gc.getFontMetrics();
+		int w = fm.getAverageCharWidth();
+		gc.dispose();
+		return w;
+	}
+
+	public static int getCharHeight(Drawable control) {
+		GC gc = new GC(control);
+		FontMetrics fm = gc.getFontMetrics();
+		int h = fm.getHeight();
+		gc.dispose();
+		return h;
+	}
+
+	public static void setFontHeight(Control control, int height) {
+		String name = "";
+		FontData[] fontData = control.getFont().getFontData();
+		for (int i = 0; i < fontData.length; ++i) {
+			name = fontData[i].getName();
+		}
+		control.setFont(SWTResourceManager.getFont(name, height, SWT.BOLD));
+	}
+
+		// TODO
+
+
+	
+	public static void setViewerCellEditingOnDblClick(TableViewer tviewer) {
+		ColumnViewerEditorActivationStrategy actSupport = new ColumnViewerEditorActivationStrategy(tviewer) {
+			protected boolean isEditorActivationEvent(ColumnViewerEditorActivationEvent event) {
+				return event.eventType == ColumnViewerEditorActivationEvent.MOUSE_DOUBLE_CLICK_SELECTION;
+			}
+		};
+
+		TableViewerEditor.create(tviewer, actSupport, ColumnViewerEditor.DEFAULT);
+	}
+
+	
+	public static void createErrorDecorationForEmptyText(final Text widget, int marginWidth, String description) {
+		final ControlDecoration textDecoration = createErrorDecoration(widget, marginWidth, description);
+		widget.addModifyListener(new ModifyListener() {
+			@Override
+			public void modifyText(ModifyEvent e) {
+				if (widget.getText() == null || widget.getText().trim().isEmpty()) {
+					textDecoration.show();
+				} else {
+					textDecoration.hide();
+				}
+			}
+		});
+	}
+
+	
+	public static void createErrorDecorationForBlankExpression(final WTextExpression widget, int marginWidth,
+			String description) {
+		final ControlDecoration textDecoration = createErrorDecoration(widget, marginWidth, description);
+		widget.addModifyListener(new ExpressionModifiedListener() {
+			@Override
+			public void expressionModified(ExpressionModifiedEvent event) {
+				if (widget.getText() == null || widget.getText().trim().isEmpty()) {
+					textDecoration.show();
+				} else {
+					textDecoration.hide();
+				}
+			}
+		});
+	}
+
+	
+	private static ControlDecoration createErrorDecoration(final Control control, int marginWidth, String description) {
+		final ControlDecoration textDecoration = new ControlDecoration(control, SWT.LEFT | SWT.TOP);
+		textDecoration.setDescriptionText(description);
+		textDecoration.setMarginWidth(marginWidth);
+		FieldDecoration fieldDecoration = FieldDecorationRegistry.getDefault().getFieldDecoration(
+				FieldDecorationRegistry.DEC_ERROR);
+		textDecoration.setImage(fieldDecoration.getImage());
+		return textDecoration;
+	}
+
+	
+	public static boolean isPropertiesViewFocused() {
+		try {
+			String activePartViewID = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage().getActivePart()
+					.getSite().getId();
+			return PROPERTIES_VIEW_ID.equals(activePartViewID);
+		} catch (Exception e) {
+			return false;
+		}
+	}
+
+	
+	public static void setGallyeryItemImageInfo(GalleryItem item, String pluginID, String imagePath,
+			Map<String, Image> selectedImagesCache, Map<String, Image> standardImagesCache) {
+		Image selectedImg = selectedImagesCache.get(imagePath);
+		Image standardImg = standardImagesCache.get(imagePath);
+		if (selectedImg == null || standardImg == null) {
+			Image itemImage = ResourceManager.getPluginImage(pluginID, imagePath);
+			
+			selectedImg = new Image(itemImage.getDevice(), SWTImageEffects.extendArea(itemImage.getImageData(), 20, null));
+			standardImg = new Image(itemImage.getDevice(), Glow.glow(itemImage.getImageData(),
+					ResourceManager.getColor(SWT.COLOR_GRAY), 20, 0, 255));
+			
+			standardImagesCache.put(imagePath, standardImg);
+			selectedImagesCache.put(imagePath, selectedImg);
+		}
+		item.setSelectedImage(selectedImg);
+		item.setStandardImage(standardImg);
+		item.setImage(standardImg);
+	}
+
+	
+	public static boolean isArrowKey(int keyCode) {
+		return keyCode == SWT.ARROW_DOWN || keyCode == SWT.ARROW_LEFT || keyCode == SWT.ARROW_RIGHT
+				|| keyCode == SWT.ARROW_UP;
+	}
+
+}

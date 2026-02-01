@@ -1,0 +1,39 @@
+package com.narrowtux.fmm.util;
+
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
+import java.net.URI;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+
+class OpenURIEventInvocationHandler implements InvocationHandler {
+
+    private OpenUriAppleEventHandler urlHandler;
+
+    public OpenURIEventInvocationHandler(OpenUriAppleEventHandler urlHandler) {
+        this.urlHandler = urlHandler;
+    }
+
+    @SuppressWarnings({ "rawtypes", "unchecked"})
+    public Object invoke(Object proxy, Method method, Object[] args) {
+        if (method.getName().equals("openURI")) {
+            try {
+                Class openURIEventClass = Class.forName("com.apple.eawt.AppEvent$OpenURIEvent");
+                Method getURLMethod = openURIEventClass.getMethod("getURI");
+                
+                URI uri =  (URI)getURLMethod.invoke(args[0]);
+                urlHandler.handleURI(uri);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        }
+        return null;
+    }
+}
+
+public class OSXAppleEventHelper {
+        // TODO
+
+}

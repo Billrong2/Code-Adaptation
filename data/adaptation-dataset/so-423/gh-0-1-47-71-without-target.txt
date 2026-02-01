@@ -1,0 +1,45 @@
+package vandy.mooc.utils;
+
+import android.Manifest;
+import android.app.Activity;
+import android.content.Context;
+import android.content.pm.PackageManager;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
+import android.util.Log;
+import android.widget.Toast;
+
+
+public class GetPermissions {
+    private static final int REQUEST_WRITE_STORAGE = 112;
+    private static boolean hasPermission;
+
+    public static void requestPermissions(Context activity) {
+        if (hasPermission) return;
+        
+        Log.d("GetPermissions", "requesting permissions");
+        
+        hasPermission = (
+                ContextCompat.checkSelfPermission(activity,
+                                                  Manifest
+                                                      .permission
+                                                      .WRITE_EXTERNAL_STORAGE
+                ) == PackageManager.PERMISSION_GRANTED
+        );
+
+        Activity parentActivity = (Activity) activity;
+
+        
+        if (!hasPermission) {
+            ActivityCompat.requestPermissions(
+                    parentActivity,
+                    new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
+                    REQUEST_WRITE_STORAGE
+            );
+        }
+
+    }
+
+        // TODO
+
+}

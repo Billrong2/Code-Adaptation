@@ -1,0 +1,12 @@
+package quickutils.core.blur.algorithms;
+
+import android.graphics.Bitmap;
+
+import quickutils.core.blur.IBlur;
+
+
+
+public class GaussianFastBlur implements IBlur {
+    // TODO
+
+}

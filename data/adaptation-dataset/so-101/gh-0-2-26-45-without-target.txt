@@ -1,0 +1,33 @@
+package net.jejer.hipda.ui.widget;
+
+import android.content.Context;
+import android.support.design.widget.AppBarLayout;
+import android.support.design.widget.CoordinatorLayout;
+import android.util.AttributeSet;
+import android.view.View;
+
+
+@SuppressWarnings("unused")
+public class FixScrollingFooterBehavior extends AppBarLayout.ScrollingViewBehavior {
+
+    private AppBarLayout appBarLayout;
+
+    public FixScrollingFooterBehavior() {
+        super();
+    }
+
+    public FixScrollingFooterBehavior(Context context, AttributeSet attrs) {
+        super(context, attrs);
+    }
+
+    // TODO
+
+
+
+    private int calculateBottomPadding(AppBarLayout dependency) {
+        if ("0".equals(dependency.getTag()))
+            return 0;
+        final int totalScrollRange = dependency.getTotalScrollRange();
+        return totalScrollRange + dependency.getTop();
+    }
+}

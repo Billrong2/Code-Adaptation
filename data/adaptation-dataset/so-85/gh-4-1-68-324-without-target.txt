@@ -1,0 +1,38 @@
+package info.fulloo.trygve.mylibrary;
+
+
+
+public class Unescape_perl_string extends Object {
+
+// TODO
+
+
+
+public final static
+String uniplus(String s) {
+    if (s.length() == 0) {
+        return "";
+    }
+    
+    StringBuffer sb = new StringBuffer(2 + 3 * s.length());
+    sb.append("U+");
+    for (int i = 0; i < s.length(); i++) {
+        sb.append(String.format("%X", s.codePointAt(i)));
+        if (s.codePointAt(i) > Character.MAX_VALUE) {
+            i++; 
+        }
+        if (i+1 < s.length()) {
+            sb.append(".");
+        }
+    }
+    return sb.toString();
+}
+
+private static final
+void die(String foa) {
+   throw new IllegalArgumentException(foa);
+}
+
+
+}
+

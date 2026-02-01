@@ -1,0 +1,96 @@
+package betterbluetoothle.async;
+
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
+
+import org.jdeferred.Promise;
+import org.jdeferred.impl.DeferredObject;
+
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
+public class AsyncBluetoothLeScan implements BluetoothAdapter.LeScanCallback {
+
+    
+    public class ScanResult {
+        public final BluetoothDevice device;
+        public final int rssi;
+        public final byte[] bytes;
+
+        public ScanResult(BluetoothDevice device, int rssi, byte[] bytes) {
+            this.device = device;
+            this.rssi = rssi;
+            this.bytes = bytes;
+        }
+
+                // TODO
+
+    }
+
+    private BluetoothAdapter adapter;
+    private DeferredObject<Void, Void, ScanResult> scan;
+    private UUID[] filter;
+
+    public AsyncBluetoothLeScan(BluetoothAdapter adapter) {
+        this.adapter = adapter;
+    }
+
+    
+    
+    public Promise<Void, Void, ScanResult> start(UUID[] uuid) {
+        if (scan != null && scan.isPending()) {
+            scan.resolve(null);
+        }
+        scan = new DeferredObject<Void, Void, ScanResult>();
+        filter = uuid;
+        
+        
+        if (!adapter.startLeScan(this)) {
+            scan.reject(null);
+        }
+        return scan.promise();
+    }
+
+    
+
+    public Promise<Void, Void, ScanResult> start() {
+        return start((UUID[])null);
+    }
+
+    public Promise<Void, Void, ScanResult> start(UUID uuid) {
+        return start(new UUID[] { uuid });
+    }
+
+    
+    public void stop() {
+        adapter.stopLeScan(this);
+        if (scan != null && scan.isPending()) {
+            scan.resolve(null);
+        }
+    }
+
+    @Override
+    public void onLeScan(BluetoothDevice bluetoothDevice, int i, byte[] bytes) {
+        
+        if (scan != null && scan.isPending()) {
+            ScanResult result = new ScanResult(bluetoothDevice, i, bytes);
+            if (filter == null) {
+                
+                scan.notify(result);
+            }
+            else {
+                
+                List<UUID> serviceUUIDs = result.parseUUIDs();
+                for (UUID uuid : filter) {
+                    if (serviceUUIDs.contains(uuid)) {
+                        scan.notify(result);
+                        return;
+                    }
+                }
+            }
+        }
+    }
+}

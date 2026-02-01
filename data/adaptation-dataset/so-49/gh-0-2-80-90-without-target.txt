@@ -1,0 +1,107 @@
+
+
+package com.androidplot.util;
+
+import android.content.Context;
+import android.graphics.PointF;
+import android.graphics.RectF;
+import android.util.DisplayMetrics;
+import android.util.TypedValue;
+
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+public class PixelUtils {
+    private static DisplayMetrics metrics;
+
+    
+    public static void init(Context ctx) {
+        metrics = ctx.getResources().getDisplayMetrics();
+    }
+
+    public static PointF add(PointF lhs, PointF rhs) {
+        return new PointF(lhs.x + rhs.x, lhs.y + rhs.y);
+    }
+
+    public static PointF sub(PointF lhs, PointF rhs) {
+        return new PointF(lhs.x - rhs.x, lhs.y - rhs.y);
+    }
+
+    
+    public static float dpToPix(float dp) {
+        checkMetrics();
+        return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp, metrics);
+
+    }
+
+    
+    @SuppressWarnings("SameParameterValue")
+    public static float spToPix(float sp) {
+        checkMetrics();
+        return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, sp, metrics);
+    }
+
+    
+    
+    public static final Map<String, Integer> dimensionConstantLookup = initDimensionConstantLookup();
+
+    // TODO
+
+
+    
+    protected static final String DIMENSION_REGEX = "^\\-?\\s*(\\d+(\\.\\d+)*)\\s*([a-zA-Z]+)\\s*$";
+    protected static final Pattern DIMENSION_PATTERN = Pattern.compile(DIMENSION_REGEX);
+
+    public static float stringToDimension(String dimension) {
+        
+        InternalDimension internalDimension = stringToInternalDimension(dimension);
+        return TypedValue.applyDimension(internalDimension.unit, internalDimension.value, metrics);
+    }
+
+    private static InternalDimension stringToInternalDimension(String dimension) {
+        
+        Matcher matcher = DIMENSION_PATTERN.matcher(dimension);
+        if (matcher.matches()) {
+            
+            
+            float value = Float.valueOf(matcher.group(1));
+            
+            String unit = matcher.group(3).toLowerCase();
+            
+            Integer dimensionUnit = dimensionConstantLookup.get(unit);
+            if (dimensionUnit == null) {
+                
+                throw new NumberFormatException();
+            } else {
+                
+                return new InternalDimension(value, dimensionUnit);
+            }
+        } else {
+            
+            throw new NumberFormatException();
+        }
+    }
+
+    private static class InternalDimension {
+        float value;
+        int unit;
+
+        public InternalDimension(float value, int unit) {
+            this.value = value;
+            this.unit = unit;
+        }
+    }
+
+    
+    private static void checkMetrics() {
+        if(metrics == null) {
+            throw new RuntimeException("PixelUtils not initialized; call PixelUtils.init(Context) before using.");
+        }
+    }
+}
+
+
+

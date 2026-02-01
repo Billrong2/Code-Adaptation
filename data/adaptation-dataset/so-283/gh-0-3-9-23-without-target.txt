@@ -1,0 +1,11 @@
+package com.gitonway.lee.niftymodaldialogeffects.lib;
+
+import android.graphics.ColorFilter;
+import android.graphics.ColorMatrixColorFilter;
+
+
+public class ColorUtils {
+
+    // TODO
+
+}

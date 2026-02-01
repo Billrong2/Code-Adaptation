@@ -1,0 +1,811 @@
+
+package opensource.hexiano;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.TreeMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import android.os.Bundle;
+import android.preference.*;
+import android.util.Log;
+import android.widget.Toast;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.net.Uri;
+
+import opensource.hexiano.R;
+
+public class Prefer extends PreferenceActivity
+{
+
+	static SharedPreferences mPrefs;
+	static SharedPreferences.Editor mPrefsEditor;
+	
+	static String multiInstrumentsSeparator = "|";
+	static String multiInstrumentsAttrSeparator = ";";
+	
+	@Override
+	public void onCreate(Bundle savedInstanceState)
+	{
+		super.onCreate(savedInstanceState);
+		addPreferencesFromResource(R.xml.preferences);
+		mPrefs = PreferenceManager.getDefaultSharedPreferences(getBaseContext());
+		mPrefsEditor = mPrefs.edit();
+		
+		mPrefsEditor.putBoolean("multiInstrumentsEditClick", false);
+		mPrefsEditor.commit();
+		
+		
+		ArrayList<String> externalInstruments = GenericInstrument.listExternalInstruments(); 
+		String[] staticInstruments = getApplicationContext().getResources().getStringArray(R.array.instruments); 
+		int pos = 0; 
+		for (String instr : staticInstruments) { 
+			externalInstruments.add(pos++, instr);
+		}
+		final CharSequence[] entries = externalInstruments.toArray(new CharSequence[externalInstruments.size()]); 
+		ListPreference lp = (ListPreference)findPreference("instrument"); 
+		ListPreference lpm = (ListPreference)findPreference("minstrument"); 
+		lp.setEntries(entries); 
+		lp.setEntryValues(entries); 
+		lpm.setEntries(entries);
+		lpm.setEntryValues(entries);
+		
+		
+		memoUpdateLoadMultiInstrumentsMapping(mPrefs);
+		
+		
+		Boolean isMultiInstrumentsEnabled = Prefer.mPrefs.getBoolean("multiInstrumentsEnable", false);
+        Preference instrument = findPreference("instrument");
+		Preference multiInstrumentsScreen = findPreference("multiInstrumentsScreen");
+        if (isMultiInstrumentsEnabled) {
+			multiInstrumentsScreen.setEnabled(true);
+		} else {
+			multiInstrumentsScreen.setEnabled(false);
+		}
+		
+		
+		Preference multiInstrumentsEnable = findPreference("multiInstrumentsEnable");
+		multiInstrumentsEnable.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+			@Override
+			public boolean onPreferenceChange(Preference multiInstrumentsEnable, Object newValue)
+			{
+				Log.d("Instrument", "onPreferenceClick, multiInstrumentsEnable");
+				if(newValue instanceof Boolean){
+		            Boolean boolVal = (Boolean)newValue;
+		            Preference instrument = findPreference("instrument");
+					Preference multiInstrumentsScreen = findPreference("multiInstrumentsScreen");
+		            if (boolVal) {
+						multiInstrumentsScreen.setEnabled(true);
+					} else {
+						multiInstrumentsScreen.setEnabled(false);
+					}
+		        }
+				return true;
+			}
+			
+		});
+		
+		
+		Preference multiInstrumentsSubmit = (Preference)findPreference("multiInstrumentsSubmit");
+		multiInstrumentsSubmit.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+		                @Override
+		                public boolean onPreferenceClick(Preference multiInstrumentsSubmit) {
+		                	boolean error = false;
+		                	
+		                	
+		                	
+		                	String minstrumentStr = mPrefs.getString("minstrument", "");
+
+		                	
+		                	String multiInstrumentsRangeStr = mPrefs.getString("multiInstrumentsRange", "");
+		                	Pattern pat = Pattern.compile("(K|C|R)([0-9]+)-([0-9]+)", Pattern.CASE_INSENSITIVE);
+		                	Matcher mat = pat.matcher(multiInstrumentsRangeStr);
+		                	if (!mat.find())
+		        			{
+		                		error = true;
+		                		Toast.makeText(getBaseContext(), "Error: invalid Range", Toast.LENGTH_LONG).show();
+		                		return false;
+		        			} else {
+		        				if (Integer.parseInt(mat.group(3)) < Integer.parseInt(mat.group(2))) {
+		        					error = true;
+		        					Toast.makeText(getBaseContext(), "Error: invalid Range", Toast.LENGTH_LONG).show();
+			                		return false;
+		        				}
+		        			}
+
+		                	
+		                	String mbaseNoteStr = mPrefs.getString("mbaseNote", "");
+		                	
+		                	
+		                	String mbaseOctaveStr = mPrefs.getString("mbaseOctave", "");
+		                	if (mbaseOctaveStr.replaceAll("[^0-9]", "").length() == 0) {
+		                		error = true;
+	        					Toast.makeText(getBaseContext(), "Error: invalid Base Octave", Toast.LENGTH_LONG).show();
+		                		return false;
+		                	}
+		                	
+		                	
+		                	boolean miKeepBaseNoteOctave = mPrefs.getBoolean("multiInstrumentsKeepBaseNoteOctave", false);
+		                	String miKeepBaseNoteOctaveStr = null;
+		                	if (miKeepBaseNoteOctave) {
+		                		miKeepBaseNoteOctaveStr = "true";
+		                	} else {
+		                		miKeepBaseNoteOctaveStr = "false";
+		                	}
+		                	
+		                	
+		                	String[] attributes_mapping = new String[] {minstrumentStr, multiInstrumentsRangeStr, mbaseNoteStr, mbaseOctaveStr, miKeepBaseNoteOctaveStr};
+		                	if (((String)multiInstrumentsSubmit.getTitle()).equalsIgnoreCase(getResources().getString(R.string.add))) {
+			                	
+			                	error = error | !appendMultiInstrumentsMapping(mPrefs, mPrefsEditor, attributes_mapping);
+		                	} else if (((String)multiInstrumentsSubmit.getTitle()).equalsIgnoreCase(getResources().getString(R.string.edit))) {
+		                		
+		                		int id = mPrefs.getInt("multiInstrumentsEditId", -1);
+		                		if (id < 0) {
+		                			error = true;
+		                		} else {
+		                			error = error | !updateMultiInstrumentsMapping(mPrefs, mPrefsEditor, id, attributes_mapping);
+		                		}
+		                	}
+
+		                	
+		                	refreshPreferenceScreenByClick("multiInstrumentsScreen");
+		            		
+		                	closePreferenceScreen("multiInstrumentsAddScreen");
+		                	
+		                	
+
+		                    return !error;
+		                }
+		            });
+		
+		
+		Preference multiInstrumentsDelete = findPreference("multiInstrumentsDelete");
+		multiInstrumentsDelete.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() { 
+            @Override
+            public boolean onPreferenceClick(Preference multiInstrumentsDelete) {
+            	boolean error = false;
+            	int id = mPrefs.getInt("multiInstrumentsEditId", -1);
+            	if (id < 0) {
+            		error = true;
+            	} else {
+                	deleteMultiInstrumentsMapping(mPrefs, mPrefsEditor, id); 
+            	}
+
+            	
+            	refreshPreferenceScreenByClick("multiInstrumentsScreen");
+        		
+            	closePreferenceScreen("multiInstrumentsAddScreen");
+            	
+            	
+
+            	return !error;
+            }
+		});
+		
+		
+		multiInstrumentsScreen.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+		                @Override
+		                public boolean onPreferenceClick(Preference multiInstrumentsScreen) {
+		                	
+		                	String[] mapping = Prefer.getMultiInstrumentsMapping(mPrefs);
+		                	
+		                	if (mapping != null) {
+		                		
+		                		PreferenceCategory heading_mi = (PreferenceCategory)findPreference("heading_multiInstruments");
+		                		heading_mi.removeAll(); 
+		                		onContentChanged();
+		                		System.gc();
+
+		                		
+		                		for (int i=0;i < mapping.length;i++) {
+		                			
+		                			HashMap<String, String> mappingattr = Prefer.getMultiInstrumentsMappingForId(i);
+		                			
+		                			
+		                			
+		                			Preference instru = new Preference(getBaseContext()); 
+		                			instru.setKey("minstru_"+Integer.toString(i));
+		                			instru.setTitle("ID " + Integer.toString(i) + ": " + mappingattr.get("instrument"));
+		                			String baseNoteOctaveDesc = mappingattr.get("keepBaseNoteOctave").equals("true") ? "BaseNote and BaseOctave: same as layout" : "BaseNote:" + mappingattr.get("baseNote") + " BaseOctave:" + mappingattr.get("baseOctave");
+		                			instru.setSummary(baseNoteOctaveDesc + " KeyRange:" + mappingattr.get("rangeType") + " from " + mappingattr.get("rangeStart") + " to " + mappingattr.get("rangeEnd"));
+
+		                			
+		                			instru.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+		        		                @Override
+		        		                public boolean onPreferenceClick(Preference instru) {
+		        		                	
+		        		                	String instruTitle = (String) instru.getTitle();
+		        		                	Pattern pat = Pattern.compile("ID\\s+([0-9]+)", Pattern.CASE_INSENSITIVE);
+		        		                	Matcher mat = pat.matcher(instruTitle);
+		        		                	if (mat.find()) {
+		        		                		
+			        		                	int id = Integer.parseInt(mat.group(1));
+
+			        		                	
+					                			HashMap<String, String> mappingattr = Prefer.getMultiInstrumentsMappingForId(id);
+
+					                			
+					                			mPrefsEditor.putInt("multiInstrumentsEditId", id); 
+			        		                	mPrefsEditor.putString("minstrument", mappingattr.get("instrument"));
+			        		                	mPrefsEditor.putString("multiInstrumentsRange", mappingattr.get("range"));
+			        		                	mPrefsEditor.putString("mbaseNoteStr", mappingattr.get("baseNote"));
+			        		                	mPrefsEditor.putString("mbaseOctaveStr", mappingattr.get("baseOctave"));
+			        		                	mPrefsEditor.putBoolean("multiInstrumentsKeepBaseNoteOctave", mappingattr.get("keepBaseNoteOctave").equals("true") ? true : false);
+			        		                	mPrefsEditor.commit(); 
+			        		                	
+			        		                	
+			        		                	
+			        		                	
+			        		                	
+			        		                	ListPreference minstrument = (ListPreference)findPreference("minstrument");
+					                			EditTextPreference multiInstrumentsRange = (EditTextPreference)findPreference("multiInstrumentsRange");
+					                			ListPreference mbaseNote = (ListPreference)findPreference("mbaseNote");
+					                			ListPreference mbaseOctave = (ListPreference)findPreference("mbaseOctave");
+					                			CheckBoxPreference miKeepBaseNoteOctave = (CheckBoxPreference)findPreference("multiInstrumentsKeepBaseNoteOctave");
+					                			minstrument.setValue(mappingattr.get("instrument"));
+					                			multiInstrumentsRange.setText(mappingattr.get("range"));
+					                			mbaseNote.setValue(mappingattr.get("baseNote"));
+					                			mbaseOctave.setValue(mappingattr.get("baseOctave"));
+					                			miKeepBaseNoteOctave.setChecked(mappingattr.get("keepBaseNoteOctave").equals("true") ? true : false);
+					                			
+					                			
+					                			
+					                			
+					                			Preference multiInstrumentsSubmit = findPreference("multiInstrumentsSubmit");
+					                			multiInstrumentsSubmit.setTitle(R.string.edit);
+					                			
+					                			
+					                			
+					                			
+					                			
+					                			
+					                			PreferenceScreen multiInstrumentsAddScreen = (PreferenceScreen)findPreference("multiInstrumentsAddScreen");
+					                			Preference multiInstrumentsDelete = findPreference("multiInstrumentsDelete");
+					                			
+					                			multiInstrumentsDelete.setTitle(R.string.delete);
+					                			multiInstrumentsDelete.setEnabled(true);
+					                			
+					                			multiInstrumentsDelete.setDefaultValue((int)(Math.random()*1000)); onContentChanged(); 
+					                			
+					                			
+					                			mPrefsEditor.putBoolean("multiInstrumentsEditClick", true); 
+					                			mPrefsEditor.commit();
+					                			openPreference("multiInstrumentsAddScreen"); 
+		        		                	}
+
+		        		                	return true;
+		        		                }
+		        		            });
+		                			
+		                			
+		                			heading_mi.addPreference(instru);
+		                		}
+		                		
+		                	}
+		                	return true;
+		                }
+		});
+		
+		
+		Preference multiInstrumentsAddScreen = (PreferenceScreen)findPreference("multiInstrumentsAddScreen");
+		multiInstrumentsAddScreen.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+			@Override
+            public boolean onPreferenceClick(Preference multiInstrumentsAddScreen) {
+				
+				Boolean editClick = mPrefs.getBoolean("multiInstrumentsEditClick", false); 
+				if (editClick) { 
+					mPrefsEditor.putBoolean("multiInstrumentsEditClick", false); 
+	    			mPrefsEditor.commit();
+				} else { 
+					
+        			
+        			
+
+					
+					Preference multiInstrumentsSubmit = findPreference("multiInstrumentsSubmit");
+	    			multiInstrumentsSubmit.setTitle(R.string.add);
+	
+	    			
+	    			Preference multiInstrumentsDelete = findPreference("multiInstrumentsDelete");
+	    			multiInstrumentsDelete.setTitle("");
+	    			multiInstrumentsDelete.setEnabled(false);
+	    			
+				}
+				
+				return true;
+			}
+		});
+		
+		
+		Preference multiInstrumentsClear = findPreference("multiInstrumentsClear");
+		multiInstrumentsClear.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+			@Override
+            public boolean onPreferenceClick(Preference multiInstrumentsClear) {
+				
+				clearMultiInstrumentsMapping(mPrefsEditor);
+				
+				PreferenceCategory heading_mi = (PreferenceCategory)findPreference("heading_multiInstruments");
+        		heading_mi.removeAll(); 
+        		onContentChanged();
+        		System.gc();
+
+        		refreshPreferenceScreenByClick("multiInstrumentsScreen");
+				
+				
+				return true;
+			}
+		});
+		
+		
+		Preference multiInstrumentsSaveProfile = findPreference("multiInstrumentsSaveProfile");
+		multiInstrumentsSaveProfile.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+			@Override
+            public boolean onPreferenceChange(Preference multiInstrumentsSaveProfile, Object newValue)
+			{
+				if(newValue instanceof String){
+		            String mappingTitle = (String)newValue;
+		            String miConf = getMultiInstrumentsConf(mPrefs);
+				
+		            memoAppendMultiInstrumentsMapping(mPrefs, mPrefsEditor, miConf, mappingTitle); 
+		            memoUpdateLoadMultiInstrumentsMapping(mPrefs); 
+				}
+				
+				return true;
+			}
+		});
+		
+		
+		Preference multiInstrumentsLoadProfile = findPreference("multiInstrumentsLoadProfile");
+		multiInstrumentsLoadProfile.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+			@Override
+            public boolean onPreferenceChange(Preference multiInstrumentsLoadProfile, Object newValue) {
+				if(newValue instanceof String){
+		            String mappingValue = (String)newValue;
+		            if (mappingValue.length() > 0) {
+			            mPrefsEditor.putString("multiInstrumentsConfig", mappingValue);
+			            if (mPrefsEditor.commit()) refreshPreferenceScreenByClick("multiInstrumentsScreen"); 
+		            } else {
+		            	return false;
+		            }
+				}
+				
+				return true;
+			}
+		});
+		
+		
+		Preference multiInstrumentsDeleteProfile = findPreference("multiInstrumentsDeleteProfile");
+		multiInstrumentsDeleteProfile.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+			@Override
+            public boolean onPreferenceChange(Preference multiInstrumentsDeleteProfile, Object newValue) {
+				if(newValue instanceof String){
+		            String mappingValue = (String)newValue;
+		            if (mappingValue.length() > 0) {
+		            	boolean retcode = memoDeleteMultiInstrumentsMapping(mPrefs, mPrefsEditor, mappingValue);
+		            	memoUpdateLoadMultiInstrumentsMapping(mPrefs); 
+		            	return retcode;
+		            } else {
+		            	return false;
+		            }
+				}
+				
+				return true;
+			}
+		});
+
+		
+		
+		
+		
+		Preference issue_45 = findPreference("issue-45");
+		issue_45.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+				@Override
+				public boolean onPreferenceClick(Preference issue_45)
+				{
+					Log.d("Prefer", "onPreferenceClick, issue_45");
+					Uri webpage = Uri.parse("https://sourceforge.net/p/isokeys/tickets/45/");
+					Intent webIntent = new Intent(Intent.ACTION_VIEW, webpage);
+					startActivity(webIntent);
+					return false;
+				}
+			}
+		);
+		Preference issue_18812 = findPreference("issue-18812");
+		issue_18812.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+				@Override
+				public boolean onPreferenceClick(Preference issue_18812)
+				{
+					Log.d("Prefer", "onPreferenceClick, issue_18812");
+					Uri webpage = Uri.parse("https://code.google.com/p/android/issues/detail?id=18812");
+					Intent webIntent = new Intent(Intent.ACTION_VIEW, webpage);
+					startActivity(webIntent);
+					return false;
+				}
+			}
+		);
+		Preference issue_30198 = findPreference("issue-30198");
+		issue_30198.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+				@Override
+				public boolean onPreferenceClick(Preference issue_30198)
+				{
+					Log.d("Prefer", "onPreferenceClick, issue_30198");
+					Uri webpage = Uri.parse("https://code.google.com/p/android/issues/detail?id=30198");
+					Intent webIntent = new Intent(Intent.ACTION_VIEW, webpage);
+					startActivity(webIntent);
+					return false;
+				}
+			}
+		);
+		Preference issue_10176 = findPreference("issue-10176");
+		issue_10176.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+				@Override
+				public boolean onPreferenceClick(Preference issue_10176)
+				{
+					Log.d("Prefer", "onPreferenceClick, issue_10176");
+					Uri webpage = Uri.parse("https://code.google.com/p/android/issues/detail?id=10176");
+					Intent webIntent = new Intent(Intent.ACTION_VIEW, webpage);
+					startActivity(webIntent);
+					return false;
+				}
+			}
+		);
+		Preference issue_8201 = findPreference("issue-8201");
+		issue_8201.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+				@Override
+				public boolean onPreferenceClick(Preference issue_8201)
+				{
+					Log.d("Prefer", "onPreferenceClick, issue_8201");
+					Uri webpage = Uri.parse("https://code.google.com/p/android/issues/detail?id=8201");
+					Intent webIntent = new Intent(Intent.ACTION_VIEW, webpage);
+					startActivity(webIntent);
+					return false;
+				}
+			}
+		);
+		
+	}
+	
+	public static String getMultiInstrumentsConf(SharedPreferences mPrefs) {
+		return mPrefs.getString("multiInstrumentsConfig", "");
+	}
+	
+	
+	public static String[] getMultiInstrumentsMapping(SharedPreferences mPrefs) {
+		
+    	String miConf = mPrefs.getString("multiInstrumentsConfig", "");
+    	
+    	miConf = cleanConfRegexp(miConf);
+    	
+    	if (miConf.length() > 0) {
+    		
+    		String[] mapping = miConf.split("\\"+multiInstrumentsSeparator);
+
+    		return mapping;
+    	} else {
+    		return null;
+    	}
+	}
+
+	
+	
+	public static HashMap<String, String> mappingArrayToHashmap(String mapping, int id) {
+		
+		HashMap<String, String> mappingattr = new HashMap<String, String>();
+		
+		String[] attr = mapping.split(multiInstrumentsAttrSeparator);
+		mappingattr.put("id", Integer.toString(id));
+		mappingattr.put("instrument", attr[0]); 
+		mappingattr.put("range", attr[1]); 
+		mappingattr.put("baseNote", attr[2]); 
+		mappingattr.put("baseOctave", attr[3]); 
+		mappingattr.put("keepBaseNoteOctave", attr[4]); 
+		
+		Pattern pat = Pattern.compile("(K|C|R)([0-9]+)-([0-9]+)", Pattern.CASE_INSENSITIVE);
+    	Matcher mat = pat.matcher(mappingattr.get("range"));
+    	if (mat.find()) {
+    		if (mat.group(1).equals("K")) {
+    			mappingattr.put("rangeType", "Key");
+    		} else if (mat.group(1).equals("C")) {
+    			mappingattr.put("rangeType", "Column");
+    		} else if (mat.group(1).equals("R")) {
+    			mappingattr.put("rangeType", "Row");
+    		} else {
+    			mappingattr.put("rangeType", mat.group(1));
+    		}
+			mappingattr.put("rangeStart", mat.group(2));
+			mappingattr.put("rangeEnd", mat.group(3));
+    	}
+		
+		return mappingattr;
+	}
+	
+	
+	public static HashMap<String, String> getMultiInstrumentsMappingForId(int id) {
+		
+		String[] mapping = getMultiInstrumentsMapping(mPrefs);
+		
+		if (mapping.length > 0 && id < mapping.length) {
+			
+			HashMap<String, String> mappingattr = mappingArrayToHashmap(mapping[id], id);
+			
+			return mappingattr;
+		} else {
+			return null;
+		}
+	}
+	
+	
+	public static TreeMap<Integer, HashMap<String, String>> getMultiInstrumentsMappingHashMap(SharedPreferences mPrefs) {
+		String[] mapping = getMultiInstrumentsMapping(mPrefs);
+		
+		if (mapping != null && mapping.length > 0) {
+			TreeMap<Integer, HashMap<String, String>> mappingfinal = new TreeMap<Integer, HashMap<String, String>>();
+			for (int i=0;i<mapping.length;i++) {
+				HashMap<String, String> mappingattr = mappingArrayToHashmap(mapping[i], i);
+				mappingfinal.put(i, mappingattr);
+			}
+			return mappingfinal;
+		} else {
+			return null;
+		}
+	}
+	
+	
+	
+	public static boolean appendMultiInstrumentsMapping (SharedPreferences mPrefs, SharedPreferences.Editor mPrefsEditor, String minstrumentStr, String multiInstrumentsRangeStr, String mbaseNoteStr, String mbaseOctaveStr, String miKeepBaseNoteOctaveStr) {
+    	
+    	String[] attributes_mapping = new String[] {minstrumentStr, multiInstrumentsRangeStr, mbaseNoteStr, mbaseOctaveStr, miKeepBaseNoteOctaveStr};
+    	return appendMultiInstrumentsMapping(mPrefs, mPrefsEditor, attributes_mapping);
+	}
+	
+	
+	
+	public static boolean appendMultiInstrumentsMapping (SharedPreferences mPrefs, SharedPreferences.Editor mPrefsEditor, String[] attributes_mapping) {
+    	
+    	String miConf = mPrefs.getString("multiInstrumentsConfig", "");
+    	
+    	
+    	if (miConf.length() != 0) miConf = miConf + multiInstrumentsSeparator;
+    	
+    	
+    	miConf = miConf + android.text.TextUtils.join(multiInstrumentsAttrSeparator, attributes_mapping);
+
+    	
+    	mPrefsEditor.putString("multiInstrumentsConfig", miConf);
+    	mPrefsEditor.commit();
+    	
+    	return true;
+	}
+	
+	
+	public static boolean saveMultiInstrumentsMapping (SharedPreferences.Editor mPrefsEditor, String[] mapping) {
+    	
+    	String miConf = android.text.TextUtils.join(multiInstrumentsSeparator, mapping);
+    	
+    	
+    	miConf = cleanConfRegexp(miConf);
+
+    	
+    	mPrefsEditor.putString("multiInstrumentsConfig", miConf);
+    	mPrefsEditor.commit();
+    	
+    	return true;
+	}
+	
+	
+	public static boolean updateMultiInstrumentsMapping(SharedPreferences mPrefs, SharedPreferences.Editor mPrefsEditor, int id, String[] attributes_mapping) {
+		String[] mapping = getMultiInstrumentsMapping(mPrefs);
+		if (id < mapping.length) {
+			mapping[id] = android.text.TextUtils.join(multiInstrumentsAttrSeparator, attributes_mapping);
+			saveMultiInstrumentsMapping(mPrefsEditor, mapping);
+			return true;
+		} else {
+			return false;
+		}
+	}
+	
+	public static boolean clearMultiInstrumentsMapping(SharedPreferences.Editor mPrefsEditor) {
+		mPrefsEditor.putString("multiInstrumentsConfig", "");
+		mPrefsEditor.commit();
+		return true;
+	}
+
+	
+	public static boolean deleteMultiInstrumentsMapping(SharedPreferences mPrefs, SharedPreferences.Editor mPrefsEditor, int id) {
+		String[] mapping = getMultiInstrumentsMapping(mPrefs);
+		if (id < mapping.length) {
+			if (mapping.length == 1) { 
+				clearMultiInstrumentsMapping(mPrefsEditor);
+				return true;
+			} else {
+				mapping[id] = ""; 
+				saveMultiInstrumentsMapping(mPrefsEditor, mapping);
+				return true;
+			}
+		} else {
+			return false;
+		}
+	}
+	
+	
+	public static boolean memoSaveMultiInstrumentsMapping(SharedPreferences.Editor mPrefsEditor, ArrayList<String> newentries, ArrayList<String> newentryvalues) {
+		
+		saveArray(mPrefsEditor, "multiInstrumentsMemoEntries", newentries.toArray(new String[newentries.size()]));
+		saveArray(mPrefsEditor, "multiInstrumentsMemoValues", newentryvalues.toArray(new String[newentryvalues.size()]));
+
+		return true;
+	}
+	
+	
+	public static boolean memoAppendMultiInstrumentsMapping(SharedPreferences mPrefs, SharedPreferences.Editor mPrefsEditor, String miConf, String miTitle) {
+		
+		ArrayList<String> newentries = loadArrayList(mPrefs, "multiInstrumentsMemoEntries");
+		ArrayList<String> newentryvalues = loadArrayList(mPrefs, "multiInstrumentsMemoValues");
+		newentries.add(miTitle);
+		newentryvalues.add(miConf);
+		
+		memoSaveMultiInstrumentsMapping(mPrefsEditor, newentries, newentryvalues);
+
+		
+
+		return true;
+	}
+	
+	
+	public boolean memoUpdateLoadMultiInstrumentsMapping(SharedPreferences mPrefs) {
+		ArrayList<String> loadentries = loadArrayList(mPrefs, "multiInstrumentsMemoEntries");
+		ArrayList<String> loadentryvalues = loadArrayList(mPrefs, "multiInstrumentsMemoValues");
+		
+		if (loadentries.size() == 0) {
+			return false;
+		} else {
+			ListPreference miLoad = (ListPreference)findPreference("multiInstrumentsLoadProfile"); 
+			ListPreference miDelete = (ListPreference)findPreference("multiInstrumentsDeleteProfile"); 
+			
+			
+			final CharSequence[] entries = loadentries.toArray(new CharSequence[loadentries.size()]);
+			final CharSequence[] entryValues = loadentryvalues.toArray(new CharSequence[loadentryvalues.size()]);
+	
+			
+			miLoad.setEntries(entries); 
+			miLoad.setEntryValues(entryValues); 
+			miDelete.setEntries(entries);
+			miDelete.setEntryValues(entryValues);
+			
+			return true;
+		}
+	}
+	
+	
+	public static boolean memoLoadMultiInstrumentsMapping(SharedPreferences mPrefs, SharedPreferences.Editor mPrefsEditor, String miTitle) {
+		ArrayList<String> loadentries = loadArrayList(mPrefs, "multiInstrumentsMemoEntries");
+		ArrayList<String> loadentryvalues = loadArrayList(mPrefs, "multiInstrumentsMemoValues");
+		
+		int index = ListGetIndexOfValue(miTitle, loadentries);
+		
+		if (loadentries == null || loadentryvalues == null || loadentries.size() == 0 || index == -1 ) {
+			return false;
+		} else {
+			
+			mPrefsEditor.putString("multiInstrumentsConfig", loadentryvalues.get(index));
+			mPrefsEditor.commit();
+			
+			return true;
+		}
+	}
+	
+	
+	
+	public static boolean memoDeleteMultiInstrumentsMapping(SharedPreferences mPrefs, SharedPreferences.Editor mPrefsEditor, String miValue) {
+		ArrayList<String> loadentries = loadArrayList(mPrefs, "multiInstrumentsMemoEntries");
+		ArrayList<String> loadentryvalues = loadArrayList(mPrefs, "multiInstrumentsMemoValues");
+
+		int index = ListGetIndexOfValue(miValue, loadentryvalues);
+
+		if (loadentryvalues == null || loadentryvalues.size() == 0 || index == -1 ) {
+			return false;
+		} else {
+			
+			loadentries.remove(index);
+			loadentryvalues.remove(index);
+			
+			return memoSaveMultiInstrumentsMapping(mPrefsEditor, loadentries, loadentryvalues);
+		}
+	}
+	
+	
+	public static String cleanConfRegexp (String miConf) {
+		
+    	miConf = miConf.replaceAll("\\"+multiInstrumentsSeparator + "\\"+multiInstrumentsSeparator, multiInstrumentsSeparator);
+    	miConf = miConf.replaceAll("\\"+multiInstrumentsSeparator+"null"+"\\"+multiInstrumentsSeparator, multiInstrumentsSeparator);
+    	miConf = miConf.replaceAll("^\\"+multiInstrumentsSeparator+"+", ""); 
+    	miConf = miConf.replaceAll("\\"+multiInstrumentsSeparator+"+$", ""); 
+    	return miConf;
+	}
+	
+	
+	public static boolean saveArray(SharedPreferences.Editor mPrefsEditor, String arrayName, String[] arrayValues) {
+	    mPrefsEditor.putInt(arrayName +"_size", arrayValues.length);  
+	    for(int i=0;i < arrayValues.length;i++)  
+	        mPrefsEditor.putString(arrayName + "_" + i, arrayValues[i]);  
+	    return mPrefsEditor.commit();  
+	} 
+	
+	public static String[] loadArray(SharedPreferences mPrefs, String arrayName) {
+	    int size = mPrefs.getInt(arrayName + "_size", 0);
+	    if (size > 0) {
+		    String array[] = new String[size];
+		    for(int i=0;i<size;i++)
+		        array[i] = mPrefs.getString(arrayName + "_" + i, null);
+		    return array;
+	    } else {
+	    	return null;
+	    }
+	}
+	
+	public static ArrayList<String> loadArrayList(SharedPreferences mPrefs, String arrayName) {
+	    int size = mPrefs.getInt(arrayName + "_size", 0);
+	    ArrayList<String> array = new ArrayList<String>();
+	    if (size > 0) {
+		    for(int i=0;i<size;i++)
+		        array.add(i, mPrefs.getString(arrayName + "_" + i, null));
+	    }
+	    return array;
+	}
+	
+	public static int ListGetIndexOfValue(String value, List<String> list) {
+
+	    int i = 0;
+	    for (String entry : list) {
+	        if (entry == value) {
+	            return i;
+	        } 
+	        i++;
+	    }
+	    return -1;
+	}
+
+	
+	
+		// TODO
+
+
+	
+	
+	private void openPreference( String key ) {
+	    PreferenceScreen screen = findPreferenceScreenForPreference( key, null );
+	    if( screen != null ) {
+	        screen.onItemClick(null, findPreference(key).getView(null, null), findPreference(key).getOrder(), 0);
+	    }
+	}
+	
+	private void openPreferenceAlt( String key, String parent ) {
+		
+		PreferenceScreen screen = (PreferenceScreen) findPreference(parent);
+
+		
+		int pos = findPreference(key).getOrder();
+
+		
+		screen.onItemClick( null, null, pos, 0 ); 
+	}
+
+	
+	private void refreshPreferenceScreenByClick(String prefScreenName) {
+		
+		PreferenceScreen prefScreen = (PreferenceScreen) findPreference(prefScreenName);
+		Preference.OnPreferenceClickListener click_callback = prefScreen.getOnPreferenceClickListener();
+		click_callback.onPreferenceClick(prefScreen);
+	}
+
+	
+	
+	private void closePreferenceScreen(String prefScreenName) {
+		PreferenceScreen prefScreen = (PreferenceScreen) findPreference(prefScreenName);
+    	prefScreen.getDialog().dismiss();
+	}
+}

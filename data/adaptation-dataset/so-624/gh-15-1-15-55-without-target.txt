@@ -1,0 +1,17 @@
+package com.kogitune.wearhttp;
+
+import android.content.Context;
+
+import java.lang.reflect.Method;
+
+class JudgeAndroidWear {
+
+    public static boolean isWear(Context context){
+        String defaultCharacteristics = "";
+        String characteristics = get(context, "ro.build.characteristics", defaultCharacteristics);
+        return characteristics.contains("watch");
+    }
+
+        // TODO
+
+}

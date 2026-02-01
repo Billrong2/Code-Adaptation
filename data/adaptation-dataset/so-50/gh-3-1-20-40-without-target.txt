@@ -1,0 +1,14 @@
+package gr.watchful.permchecker.utils;
+
+
+public final class OsTypes {
+  
+  public enum OSType {
+    Windows, MacOS, Linux, Other
+  };
+
+  protected static OSType detectedOS;
+
+    // TODO
+
+}

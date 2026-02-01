@@ -1,0 +1,41 @@
+package com.pluscubed.anticipate.widget;
+
+import android.content.Context;
+import android.graphics.Paint;
+import android.support.v7.widget.AppCompatTextView;
+import android.text.Editable;
+import android.util.AttributeSet;
+import android.widget.TextView;
+
+public class CharLineBreakTextView extends AppCompatTextView {
+
+
+    public CharLineBreakTextView(Context context) {
+        super(context);
+    }
+
+    public CharLineBreakTextView(Context context, AttributeSet attrs) {
+        super(context, attrs);
+    }
+
+    public CharLineBreakTextView(Context context, AttributeSet attrs, int defStyleAttr) {
+        super(context, attrs, defStyleAttr);
+    }
+
+        // TODO
+
+
+    @Override
+    protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+        super.onSizeChanged(w, h, oldw, oldh);
+
+        breakManually(this, getEditableText());
+    }
+
+    @Override
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+
+        breakManually(this, getEditableText());
+    }
+}

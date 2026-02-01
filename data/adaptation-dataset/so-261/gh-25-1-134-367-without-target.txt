@@ -1,0 +1,134 @@
+package com.example;
+
+import android.app.Activity;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
+import android.os.Bundle;
+import android.renderscript.Allocation;
+import android.renderscript.RenderScript;
+import android.renderscript.ScriptIntrinsicBlur;
+import android.util.TimingLogger;
+import android.view.View;
+import android.view.ViewTreeObserver;
+import android.view.ViewTreeObserver.OnGlobalLayoutListener;
+import android.view.ViewTreeObserver.OnPreDrawListener;
+import android.widget.ImageView;
+import android.widget.TextView;
+
+public class FastBlurActivity extends Activity {
+    private static final String TAG = "Blurring";
+    private ImageView mImage;
+    private TextView mText;
+
+    private OnPreDrawListener mPreDrawListener = new OnPreDrawListener() {
+        @Override
+        public boolean onPreDraw() {
+            ViewTreeObserver observer = mText.getViewTreeObserver();
+            if(observer != null) {
+                observer.removeOnPreDrawListener(this);
+            }
+            Drawable drawable = mImage.getDrawable();
+            if (drawable != null && drawable instanceof BitmapDrawable) {
+                Bitmap bitmap = ((BitmapDrawable) drawable).getBitmap();
+                if (bitmap != null) {
+                    
+                    blurJava(bitmap, mText, 25);
+                }
+            }
+            return true;
+        }
+    };
+
+    private OnGlobalLayoutListener mLayoutListener = new OnGlobalLayoutListener() {
+
+        @Override
+        public void onGlobalLayout() {
+            ViewTreeObserver observer = mText.getViewTreeObserver();
+            if(observer != null) {
+                observer.addOnPreDrawListener(mPreDrawListener);
+            }
+        }
+    };
+
+    
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.main);
+        mImage = (ImageView) findViewById(R.id.image);
+        mText = (TextView)findViewById(R.id.text);
+        if (mImage != null && mText != null) {
+            ViewTreeObserver observer = mText.getViewTreeObserver();
+            if (observer != null) {
+                observer.addOnGlobalLayoutListener(
+                        mLayoutListener);
+            }
+        }
+        mText.setText("Blur in Java!");
+    }
+
+    private void blur(Bitmap bkg, View view, float radius) {
+        TimingLogger tl = new TimingLogger(TAG, "blur");
+
+        Bitmap overlay = Bitmap.createBitmap(view.getMeasuredWidth(), view.getMeasuredHeight(), Bitmap.Config.ARGB_8888);
+        tl.addSplit("Bitmap.createBitmap()");
+
+        Canvas canvas = new Canvas(overlay);
+        tl.addSplit("new Canvas()");
+        canvas.drawBitmap(bkg, -view.getLeft(), -view.getTop(), null);
+        tl.addSplit("canvas.drawBitmap()");
+
+        RenderScript rs = RenderScript.create(this);
+        tl.addSplit("RenderScript.create()");
+
+        Allocation overlayAlloc = Allocation.createFromBitmap(rs, overlay);
+        tl.addSplit("Allocation.createFromBitmap()");
+
+        ScriptIntrinsicBlur blur = ScriptIntrinsicBlur.create(rs, overlayAlloc.getElement());
+        tl.addSplit("ScriptIntrinsicBlur.create()");
+
+        blur.setInput(overlayAlloc);
+        tl.addSplit("blur.setInput()");
+
+        blur.setRadius(radius);
+        tl.addSplit("blur.setRadius()");
+
+        blur.forEach(overlayAlloc);
+        tl.addSplit("blur.forEach()");
+
+        overlayAlloc.copyTo(overlay);
+        tl.addSplit("overlayAlloc.copyTo()");
+
+        view.setBackground(new BitmapDrawable(getResources(), overlay));
+        tl.addSplit("view.setBackground()");
+
+        rs.destroy();
+        tl.addSplit("rs.destroy()");
+        tl.dumpToLog();
+    }
+
+    private void blurJava(Bitmap bkg, View view, int radius) {
+        TimingLogger tl = new TimingLogger(TAG, "blur");
+
+        Bitmap overlay = Bitmap.createBitmap(view.getMeasuredWidth(), view.getMeasuredHeight(), Bitmap.Config.ARGB_8888);
+        tl.addSplit("Bitmap.createBitmap()");
+
+        Canvas canvas = new Canvas(overlay);
+        tl.addSplit("new Canvas()");
+        canvas.drawBitmap(bkg, -view.getLeft(), -view.getTop(), null);
+        tl.addSplit("canvas.drawBitmap()");
+
+        Bitmap blurred = fastblur(overlay, radius);
+        tl.addSplit("fastblur()");
+
+        view.setBackground(new BitmapDrawable(getResources(), blurred));
+        tl.addSplit("view.setBackground()");
+
+        tl.dumpToLog();
+    }
+
+        // TODO
+
+}

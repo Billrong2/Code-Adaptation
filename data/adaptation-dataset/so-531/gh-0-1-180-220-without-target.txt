@@ -1,0 +1,356 @@
+package com.elsewhat.android.slideshow.api;
+
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.Random;
+
+import android.content.ActivityNotFoundException;
+import android.content.Context;
+import android.content.Intent;
+import android.net.Uri;
+import android.os.AsyncTask;
+import android.util.AttributeSet;
+import android.util.Log;
+import android.view.KeyEvent;
+import android.view.MotionEvent;
+import android.view.View;
+import android.view.animation.AlphaAnimation;
+import android.view.animation.Animation;
+import android.view.animation.ScaleAnimation;
+import android.view.animation.Animation.AnimationListener;
+import android.widget.Adapter;
+import android.widget.Gallery;
+import android.widget.ImageView;
+import android.widget.ViewAnimator;
+
+import com.elsewhat.android.slideshow.R;
+import com.elsewhat.android.slideshow.activities.SlideshowActivity;
+
+
+public class CustomGallery extends Gallery implements AnimationListener {
+
+
+	boolean mDoCustomTransition=false;
+	Animation inAnimation=null;
+	Animation outAnimation=null;
+	ViewAnimator viewAnimator=null;
+	boolean userCreatedTouchEvent = false;
+	boolean ongoingAnimation= false;
+	
+	
+
+
+	public CustomGallery(Context context) {
+		super(context);
+		 initAnimators();
+	}
+
+	public CustomGallery(Context context, AttributeSet attrs) {
+		super(context, attrs);
+		 initAnimators();
+	}
+
+	public CustomGallery(Context context, AttributeSet attrs, int defStyle) {
+		super(context, attrs, defStyle);
+		 initAnimators();
+	}
+	
+	protected void initAnimators() {
+		inAnimation = new AlphaAnimation(0.0f, 1.0f);
+		inAnimation.setDuration(2500);
+		inAnimation.setAnimationListener(this);
+		
+		outAnimation = new AlphaAnimation(1.0f, 0.0f);
+		outAnimation.setDuration(1500);
+	}
+
+	
+	@Override
+	public boolean onKeyDown(int keyCode, KeyEvent event) {
+		Log.i("CustomGallery", "onKeydown in Customer Gallery . Key code "+keyCode);
+		if(event instanceof FlingKeyEvent){
+			
+			return super.onKeyDown(keyCode,null);
+		}if(!mDoCustomTransition){
+			
+			userCreatedTouchEvent=true;
+			
+			setAnimationDuration(5500);
+			return super.onKeyDown(keyCode, event);
+		}else {
+			
+			switch (keyCode) {
+			case KeyEvent.KEYCODE_DPAD_LEFT:
+				userCreatedTouchEvent=true;
+				if (getCount() > 0 && getSelectedItemPosition() >0) {
+					setSelection(getSelectedItemPosition()-1);
+				}
+				return true;
+
+			case KeyEvent.KEYCODE_DPAD_RIGHT:
+				userCreatedTouchEvent=true;
+				
+				if (getCount() > 0 && getSelectedItemPosition() < getCount() - 1) {
+					View currentView = getSelectedView();
+					if(currentView==null){
+						Log.w("CustomGallery", "CurrentView is null in onKeyDown. Should not happen, but lets try to skip to the next photo.");
+						nextSelection();
+						return true;
+					}
+					
+					View unboundNewView= getAdapter().getView(getSelectedItemPosition()+1, null, null);
+					
+					Log.d("CustomGallery","About to evaluate an animation. OngoignAnimation="+ongoingAnimation+ " inanim="+inAnimation+" outanim="+outAnimation);
+					
+					
+					if(inAnimation==null && outAnimation==null || ongoingAnimation){
+						nextSelection();
+						
+						
+						
+					}else {
+						
+						viewAnimator = (ViewAnimator)currentView;
+						viewAnimator.addView(unboundNewView);
+						
+						
+						viewAnimator.setInAnimation(inAnimation);
+						viewAnimator.setOutAnimation(outAnimation);
+						
+						ongoingAnimation=true;
+						viewAnimator.showNext();
+						
+					}
+				}
+				return true;
+			}
+
+			return super.onKeyDown(keyCode, event);
+		}
+
+	}
+	
+	public void nextSelection(){
+		
+		if(getSelectedItemPosition()+1 >= getCount()){
+			setSelection(0);
+		}else {
+			setSelection(getSelectedItemPosition()+1);
+		}
+		
+		if(viewAnimator!=null && viewAnimator.getChildCount()==2){
+			
+			viewAnimator.setInAnimation(null);
+			viewAnimator.setOutAnimation(null);
+			viewAnimator.removeViewAt(1);
+			ongoingAnimation=false;
+		}
+		
+		
+		
+		
+		View selectedView = getSelectedView();
+		ImageAdapter adapter = (ImageAdapter)getAdapter();
+		int visibility =adapter.shouldDisplayPhotoTitle()?View.VISIBLE:View.INVISIBLE;
+		SlideshowActivity.setVisibilityOfSlideshowText(selectedView,visibility);
+		
+		
+		
+		ImageAdapter imageAdapter = (ImageAdapter)adapter;
+		imageAdapter.onGalleryNewPhoto(selectedView);
+		
+		
+		
+
+	}
+	
+
+	
+	
+	public Animation getInAnimation() {
+		return inAnimation;
+	}
+
+		// TODO
+
+	
+	
+	@Override
+	public boolean onSingleTapUp(MotionEvent motionEvent) {
+		Log.d("CustomGallery", "onSingleTapUp called for selection " + getSelectedItemPosition());
+		
+		Object currentObject = getAdapter().getItem(getSelectedItemPosition());
+		if(currentObject!=null && currentObject instanceof SlideshowPhoto){
+			SlideshowPhoto currentSlideshowPhoto = (SlideshowPhoto)currentObject;
+			if(currentSlideshowPhoto.isPromotion()){
+				
+				Analytics.trackEvent(getContext(), "actions", "promotion", "clicked");
+				Log.d("CustomGallery", "Promotion clicked, sending the user to the market for the app com.stuckincustoms.slideshow.premium" );
+				try {
+					getContext().startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("market://search?q=pname:com.stuckincustoms.slideshow.premium")));
+				}catch (ActivityNotFoundException e) {
+					getContext().startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://market.android.com/details?id=com.stuckincustoms.slideshow.premium")));
+				}
+				return true;
+			}else {
+				Adapter adapter = getAdapter();
+				if(adapter instanceof ImageAdapter){
+					ImageAdapter imageAdapter = (ImageAdapter)adapter;
+					imageAdapter.triggerActionToggleTitle();
+					return true;
+				}
+			}
+			
+		}
+		return super.onSingleTapUp(motionEvent);
+	}
+	
+	private boolean isScrollingLeft(MotionEvent e1, MotionEvent e2){
+		  return e2.getX() > e1.getX();
+		}
+	
+	
+	public boolean hasUserCreatedTouchEvent() {
+		return userCreatedTouchEvent;
+	}
+
+	
+	public void setUserCreatedTouchEvent(boolean userCreatedTouchEvent) {
+		this.userCreatedTouchEvent = userCreatedTouchEvent;
+	}
+
+	
+	public void setInAnimation(Animation inAnimation) {
+		this.inAnimation = inAnimation;
+		if(inAnimation!=null){
+			inAnimation.setAnimationListener(this);
+		}
+	}
+
+	
+	public Animation getOutAnimation() {
+		return outAnimation;
+	}
+
+	
+	public void setOutAnimation(Animation outAnimation) {
+		this.outAnimation = outAnimation;
+	}
+	
+	public void setDoCustomTransition(boolean doCustomTransition){
+		mDoCustomTransition= doCustomTransition;
+	}
+
+	
+	public boolean getDoCustomTransition(){
+		return mDoCustomTransition;
+	}
+
+	@Override
+	public void onAnimationEnd(Animation arg0) {
+		ongoingAnimation=false;
+		nextSelection();
+		
+		
+
+
+		
+	}
+
+	@Override
+	public void onAnimationRepeat(Animation animation) {
+		
+	}
+
+	@Override
+	public void onAnimationStart(Animation animation) {
+		
+	}
+	
+	
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	@Override
+	protected void onLayout(boolean changed, int l, int t, int r, int b) {
+		try {
+			super.onLayout(changed, l, t, r, b);
+		}catch (ClassCastException e) {
+			Log.e("CustomGallery", "Got a ClassCastException in onLayout most likely caused by a racecondition in the mRecycle bin ", e);
+			
+			
+			Class classGallery = this.getClass().getSuperclass().getSuperclass();
+			Method methodRecycle;
+			try {
+				methodRecycle = classGallery.getDeclaredMethod("recycleAllViews");
+				methodRecycle.setAccessible(true);
+				methodRecycle.invoke(this);
+				Log.i("CustomGallery", "Succeeded in calling recycleAllViews");
+				return;
+			} catch (SecurityException e1) {
+				
+				e1.printStackTrace();
+			} catch (NoSuchMethodException e2) {
+				
+				e2.printStackTrace();
+			} catch (IllegalArgumentException e3) {
+				
+				e3.printStackTrace();
+			} catch (IllegalAccessException e4) {
+				
+				e4.printStackTrace();
+			} catch (InvocationTargetException e5) {
+				
+				e5.printStackTrace();
+			}
+			Log.i("CustomGallery", "Failed in calling recycleAllViews");
+			
+			 
+		}
+		
+	}	
+	
+    
+    public class ZoomCurrentViewSoonTask extends AsyncTask<Void, Void, Void> {
+    	long sleepMS;
+		
+		public ZoomCurrentViewSoonTask(long ms){
+			sleepMS=ms;
+		}
+		
+		protected void onPostExecute(Void result) {
+			View currentView = getSelectedView();
+			if(currentView!=null){
+				
+				ImageView photo = (ImageView)currentView.findViewById(R.id.slideshow_photo);
+				
+				Random random = new Random (System.nanoTime());
+				float pivotXFactor = random.nextFloat();
+				float pivotYFactor = random.nextFloat();
+				float scaleFactor;
+				scaleFactor =  1.0f+ random.nextFloat()/4;
+				
+				
+				Animation zoomAnimation = new ScaleAnimation(1.0f,scaleFactor,1.0f,scaleFactor,Animation.RELATIVE_TO_SELF,pivotXFactor,Animation.RELATIVE_TO_SELF,pivotYFactor);
+				zoomAnimation.setDuration(10000);
+				zoomAnimation.setFillAfter(false);
+				zoomAnimation.setFillBefore(false);
+				photo.startAnimation(zoomAnimation);
+			}
+		}
+
+		@Override
+		protected Void doInBackground(Void... arg0) {	
+			try
+			    {
+			        Thread.sleep(sleepMS);
+			    }
+			    catch (InterruptedException ie)
+			    {
+			    	Log.d("CustomGallery", "SlideshowTimerTask received  InterruptedException", ie);
+			    }
+			
+			return null;
+		}
+
+    }
+
+}

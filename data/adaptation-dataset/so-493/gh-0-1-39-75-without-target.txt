@@ -1,0 +1,25 @@
+
+
+package com.heinrichreimersoftware.materialdrawer.animation;
+
+import android.animation.TypeEvaluator;
+import android.graphics.ColorMatrix;
+
+public class AlphaSatColorMatrixEvaluator implements TypeEvaluator {
+
+    private static final int MAX_BLACKER = 50;
+
+    private final ColorMatrix colorMatrix;
+    private final float[] elements = new float[20];
+
+    public AlphaSatColorMatrixEvaluator() {
+        colorMatrix = new ColorMatrix();
+    }
+
+    public ColorMatrix getColorMatrix() {
+        return colorMatrix;
+    }
+
+    // TODO
+
+}

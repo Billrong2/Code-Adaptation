@@ -1,0 +1,67 @@
+package io.recom.howabout.category.music.net;
+
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.URLDecoder;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.apache.http.HttpResponse;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.params.CoreProtocolPNames;
+
+
+public class YoutubeMp4StreamUrlGetter {
+
+	class Meta {
+		public String num;
+		public String type;
+		public String ext;
+
+		Meta(String num, String ext, String type) {
+			this.num = num;
+			this.ext = ext;
+			this.type = type;
+		}
+	}
+
+	class Video {
+		public String ext = "";
+		public String type = "";
+		public String url = "";
+
+		Video(String ext, String type, String url) {
+			this.ext = ext;
+			this.type = type;
+			this.url = url;
+		}
+	};
+
+	public String getYoutubeMp4StreamUrl(String youtubeMovieUrl)
+			throws Exception {
+		List<Video> videos;
+
+		videos = getStreamingUrisFromYouTubePage(youtubeMovieUrl);
+
+		for (Video video : videos) {
+			if (video.ext.equals("MP4")) {
+				return video.url;
+			}
+		}
+
+		for (Video video : videos) {
+			if (video.ext.equals("3GP")) {
+				return video.url;
+			}
+		}
+
+		throw new Exception("no youtube movie.");
+	}
+
+	// TODO

@@ -1,0 +1,25 @@
+
+package com.rampo.updatechecker;
+
+import android.app.Activity;
+import android.content.pm.PackageManager;
+
+public class Comparator {
+    
+    public static boolean isVersionDownloadableNewer(Activity mActivity, String versionDownloadable) {
+        String versionInstalled = null;
+        try {
+            versionInstalled = mActivity.getPackageManager().getPackageInfo(mActivity.getPackageName(), 0).versionName;
+        } catch (PackageManager.NameNotFoundException ignored) {
+        }
+        if (versionInstalled.equals(versionDownloadable)) { 
+            return false;
+        } else {
+            return versionCompareNumerically(versionDownloadable, versionInstalled) > 0; 
+        }
+    }
+
+        // TODO
+
+
+}

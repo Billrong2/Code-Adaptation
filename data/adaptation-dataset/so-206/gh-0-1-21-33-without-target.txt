@@ -1,0 +1,18 @@
+
+package org.connectbot;
+
+import android.os.Bundle;
+import android.support.test.runner.AndroidJUnitRunner;
+import android.util.Log;
+
+import java.lang.reflect.Method;
+
+public class FixJacocoTestRunner extends AndroidJUnitRunner {
+
+	static {
+		System.setProperty("jacoco-agent.destfile", "/data/data/" + BuildConfig.APPLICATION_ID + "/coverage.ec");
+	}
+
+	// TODO
+
+}

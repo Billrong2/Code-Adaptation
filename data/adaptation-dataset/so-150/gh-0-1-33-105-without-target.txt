@@ -1,0 +1,55 @@
+package org.matheclipse.core.reflection.system;
+
+import org.matheclipse.core.eval.EvalEngine;
+import org.matheclipse.core.eval.exception.Validate;
+import org.matheclipse.core.eval.interfaces.AbstractFunctionEvaluator;
+import org.matheclipse.core.expression.F;
+import org.matheclipse.core.interfaces.IAST;
+import org.matheclipse.core.interfaces.IExpr;
+import org.matheclipse.core.interfaces.IInteger;
+import org.matheclipse.core.interfaces.ISymbol;
+
+
+public class Prime extends AbstractFunctionEvaluator {
+
+	
+	public static int popCount(int n) {
+		n -= (n >>> 1) & 0x55555555;
+		n = ((n >>> 2) & 0x33333333) + (n & 0x33333333);
+		n = ((n >> 4) & 0x0F0F0F0F) + (n & 0x0F0F0F0F);
+		return (n * 0x01010101) >> 24;
+	}
+
+		// TODO
+
+
+	public Prime() {
+	}
+
+	@Override
+	public IExpr evaluate(IAST ast, EvalEngine engine) {
+		Validate.checkSize(ast, 2);
+
+		if (ast.arg1().isInteger()) {
+			try {
+				long nthPrime = ((IInteger) ast.arg1()).toLong();
+				if (nthPrime > 103000000L) {
+					return F.NIL;
+				}
+				return F.integer(nthPrime(nthPrime));
+			} catch (RuntimeException ae) {
+				ae.printStackTrace();
+				return F.NIL;
+			}
+		}
+
+		return F.NIL;
+	}
+
+	@Override
+	public void setUp(final ISymbol newSymbol) {
+		newSymbol.setAttributes(ISymbol.LISTABLE);
+		super.setUp(newSymbol);
+	}
+
+}

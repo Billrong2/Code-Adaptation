@@ -1,0 +1,44 @@
+
+package me.brjannc.plugins.sushi;
+
+import java.math.BigInteger;
+import java.security.KeyFactory;
+import java.security.PublicKey;
+import java.security.spec.DSAPublicKeySpec;
+import java.security.spec.RSAPublicKeySpec;
+
+import org.apache.commons.codec.binary.Base64;
+
+
+
+
+
+
+public class AuthorizedKeysDecoder {
+
+    private byte[] bytes;
+    private int pos;
+
+    // TODO
+
+
+    private String decodeType() {
+        int len = decodeInt();
+        String type = new String(bytes, pos, len);
+        pos += len;
+        return type;
+    }
+
+    private int decodeInt() {
+        return ((bytes[pos++] & 0xFF) << 24) | ((bytes[pos++] & 0xFF) << 16)
+                | ((bytes[pos++] & 0xFF) << 8) | (bytes[pos++] & 0xFF);
+    }
+
+    private BigInteger decodeBigInt() {
+        int len = decodeInt();
+        byte[] bigIntBytes = new byte[len];
+        System.arraycopy(bytes, pos, bigIntBytes, 0, len);
+        pos += len;
+        return new BigInteger(bigIntBytes);
+    }
+}

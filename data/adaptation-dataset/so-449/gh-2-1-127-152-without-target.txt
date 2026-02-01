@@ -1,0 +1,221 @@
+package com.elsdoerfer.android.autostarts;
+
+import java.io.*;
+import java.util.*;
+import java.util.concurrent.TimeoutException;
+
+import com.stericson.RootTools.RootTools;
+import com.stericson.RootTools.exceptions.RootDeniedException;
+import com.stericson.RootTools.execution.CommandCapture;
+import com.stericson.RootTools.execution.Shell;
+
+public class Utils {
+	static final String TAG = "Autostarts";
+	private static Boolean isSELinuxEnforcing = null;
+
+	
+	static String readStream(InputStream stream) throws IOException {
+		final char[] buffer = new char[0x10000];
+		StringBuilder out = new StringBuilder();
+		Reader in = new InputStreamReader(stream, "UTF-8");
+		int read;
+		do {
+			read = in.read(buffer, 0, buffer.length);
+			if (read>0)
+				out.append(buffer, 0, read);
+		} while (read>=0);
+		return out.toString();
+	}
+
+	
+	static int getHashMapIndex(LinkedHashMap<?, ?> map, Object search) {
+		Set<?> keys = map.keySet();
+		Iterator<?> i = keys.iterator();
+		Object curr;
+		int count = -1;
+		do {
+			curr = i.next();
+			count++;
+			if (curr.equals(search))
+				return count;
+		}
+		while (i.hasNext());
+		return -1;
+	}
+
+	public static class ShellFailedException extends Exception {} ;
+
+	
+	static boolean runRootCommand(final String command, String[] env,
+	                              int timeout, Shell.ShellContext context) throws ShellFailedException {
+
+		RootTools.debugMode = true;
+
+		
+		
+		
+		
+		Shell.ShellContext contextToUse = Shell.defaultContext;
+		if ((context != null) && isSELinuxEnforcing()) {
+			String display = version(false);
+			String internal = version(true);
+
+			
+			if ((display != null) &&
+					(internal != null) &&
+					(display.endsWith("SUPERSU")) &&
+					(Integer.valueOf(internal) >= 190)) {
+				contextToUse = context;
+			}
+		}
+
+		Shell shell;
+		try {
+			shell = RootTools.getShell(true, timeout, contextToUse, 0);
+		} catch (IOException e) {
+			e.printStackTrace();
+			throw new ShellFailedException();
+		} catch (TimeoutException e) {
+			e.printStackTrace();
+			throw new ShellFailedException();
+		} catch (RootDeniedException e) {
+			e.printStackTrace();
+			throw new ShellFailedException();
+		}
+
+		CommandCapture cmd = new CommandCapture(0, command);
+		try {
+			shell.add(cmd);
+		} catch (IOException e) {
+			throw new ShellFailedException();
+		}
+
+		
+		while (true) {
+			if (cmd.isFinished())
+				break;
+			sleep(100);
+		}
+
+		return (cmd.getExitCode() == 0);
+	}
+
+	
+	public static void sleep(long time) {
+		try {
+			Thread.sleep(time);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+	}
+
+		// TODO
+
+
+	
+	public static synchronized boolean isSELinuxEnforcing() {
+		if (isSELinuxEnforcing == null) {
+			Boolean enforcing = null;
+
+			
+			
+			if (android.os.Build.VERSION.SDK_INT >= 17) {
+				
+				if (enforcing == null) {
+					File f = new File("/sys/fs/selinux/enforce");
+					if (f.exists()) {
+						try {
+							InputStream is = new FileInputStream("/sys/fs/selinux/enforce");
+							try {
+								enforcing = (is.read() == '1');
+							} finally {
+								is.close();
+							}
+						} catch (Exception e) {
+						}
+					}
+				}
+
+				
+				if (enforcing == null) {
+					enforcing = (android.os.Build.VERSION.SDK_INT >= 19);
+				}
+			}
+
+			if (enforcing == null) {
+				enforcing = false;
+			}
+
+			isSELinuxEnforcing = enforcing;
+		}
+		return isSELinuxEnforcing;
+	}
+
+	
+	private static String[] suVersion = new String[] {
+			null, null
+	};
+	public static synchronized String version(boolean internal) {
+		int idx = internal ? 0 : 1;
+		if (suVersion[idx] == null) {
+			String version = null;
+
+			
+			Process process;
+			try {
+				process = Runtime.getRuntime().exec(internal ? "su -V" : "su -v", null);
+				process.waitFor();
+			} catch (IOException e) {
+				e.printStackTrace();
+				return null;
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+				return null;
+			}
+
+			
+			List<String> stdout = new ArrayList<String>();
+
+			BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+			try {
+				String line = null;
+				while ((line = reader.readLine()) != null) {
+					stdout.add(line);
+				}
+			} catch (IOException e) {
+			}
+			
+			try {
+				reader.close();
+			} catch (IOException e) {
+			}
+
+			process.destroy();
+
+			List<String> ret = stdout;
+			
+			if (ret != null) {
+				for (String line : ret) {
+					if (!internal) {
+						if (line.contains(".")) {
+							version = line;
+							break;
+						}
+					} else {
+						try {
+							if (Integer.parseInt(line) > 0) {
+								version = line;
+								break;
+							}
+						} catch (NumberFormatException e) {
+						}
+					}
+				}
+			}
+
+			suVersion[idx] = version;
+		}
+		return suVersion[idx];
+	}
+
+}

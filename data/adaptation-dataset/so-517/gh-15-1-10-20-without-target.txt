@@ -1,0 +1,9 @@
+package se.kodapan.util;
+
+
+public class Hex {
+
+  // TODO
+
+
+}

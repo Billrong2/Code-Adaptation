@@ -1,0 +1,56 @@
+
+package net.geco.basics;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.StringWriter;
+
+
+
+public class WindowsRegistryQuery {
+	// TODO
+
+
+	public static final String listRegistryEntries(String location) {
+		try {
+			Process process = Runtime.getRuntime().exec("reg query \"" + location + "\" /s"); 
+			StreamReader reader = new StreamReader(process.getInputStream());
+			reader.start();
+			process.waitFor();
+			reader.join();
+			
+			return reader.getResult();
+		} catch (Exception e) {
+			return null;
+		}
+	}
+
+	static class StreamReader extends Thread {
+		private InputStream is;
+		private StringWriter sw = new StringWriter();;
+		public StreamReader(InputStream is) {
+			this.is = is;
+		}
+		public void run() {
+			try {
+				int c;
+				while ((c = is.read()) != -1)
+					sw.write(c);
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+		public String getResult() {
+			return sw.toString();
+		}
+	}
+	
+	public static void main(String[] args) {
+		String[] entries =
+			WindowsRegistryQuery.listRegistryEntries("HKLM\\System\\CurrentControlSet\\Enum").split("\n"); 
+		for (String string : entries) {
+			if( string.contains("COM") && string.contains("FriendlyName") ) 
+				System.out.println(string.trim());
+		}
+	}
+}

@@ -1,0 +1,49 @@
+package fiji.plugin.trackmate.util;
+
+import fiji.util.NumberParser;
+
+
+public class Version implements Comparable<Version> {
+
+    private final String version;
+
+    public final String get() {
+        return this.version;
+    }
+
+    public Version(String version) {
+        if(version == null)
+            throw new IllegalArgumentException("Version can not be null");
+        
+        final int dash = version.indexOf('-');
+        if (dash > 0)
+        	version = version.substring(0, dash);
+        if(!version.matches("[0-9]+(\\.[0-9]+)*"))
+            throw new IllegalArgumentException("Invalid version format: " + version);
+        this.version = version;
+    }
+
+    @Override
+    public String toString() {
+    	return version;
+    }
+
+    // TODO
+
+
+    @Override public boolean equals(final Object that) {
+        if(this == that)
+            return true;
+        if(that == null)
+            return false;
+        if(this.getClass() != that.getClass())
+            return false;
+        return this.compareTo((Version) that) == 0;
+    }
+
+    @Override
+    public int hashCode() {
+    	return version.hashCode();
+    }
+
+}

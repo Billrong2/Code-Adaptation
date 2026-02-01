@@ -1,0 +1,10 @@
+package org.jivesoftware.spark.ui;
+
+import javax.swing.text.*;
+
+
+public class WrapColumnFactory implements ViewFactory
+{
+    // TODO
+
+}

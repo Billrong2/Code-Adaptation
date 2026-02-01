@@ -1,0 +1,87 @@
+
+
+package org.openbmap.utils;
+
+import android.content.Context;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
+import android.os.Bundle;
+
+import java.util.Timer;
+import java.util.TimerTask;
+
+
+public class CurrentLocationHelper {
+	private Timer mTimer;
+	private LocationManager mLocationManager;
+	private LocationResult mLocationResult;
+
+	private boolean mGpsEnabled = false;
+	private boolean mNetworkEnabled = false;
+
+	// TODO
+
+
+	LocationListener locationListenerGps = new LocationListener() {
+		public void onLocationChanged(final Location location) {
+			mTimer.cancel();
+			mLocationResult.gotLocation(location);
+			mLocationManager.removeUpdates(this);
+			mLocationManager.removeUpdates(locationListenerNetwork);
+		}
+		public void onProviderDisabled(final String provider) {}
+		public void onProviderEnabled(final String provider) {}
+		public void onStatusChanged(final String provider, final int status, final Bundle extras) {}
+	};
+
+	LocationListener locationListenerNetwork = new LocationListener() {
+		public void onLocationChanged(final Location location) {
+			mTimer.cancel();
+			mLocationResult.gotLocation(location);
+			mLocationManager.removeUpdates(this);
+			mLocationManager.removeUpdates(locationListenerGps);
+		}
+		public void onProviderDisabled(final String provider) {}
+		public void onProviderEnabled(final String provider) {}
+		public void onStatusChanged(final String provider, final int status, final Bundle extras) {}
+	};
+
+	class GetLastLocation extends TimerTask {
+		@Override
+		public void run() {
+			mLocationManager.removeUpdates(locationListenerGps);
+			mLocationManager.removeUpdates(locationListenerNetwork);
+
+			Location net_loc  = null, gps_loc  = null;
+			if (mGpsEnabled)
+				gps_loc = mLocationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+			if (mNetworkEnabled)
+				net_loc = mLocationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+
+			
+			if (gps_loc != null && net_loc != null){
+				if (gps_loc.getTime() > net_loc.getTime())
+					mLocationResult.gotLocation(gps_loc);
+				else
+					mLocationResult.gotLocation(net_loc);
+				return;
+			}
+
+			if (gps_loc != null) {
+				mLocationResult.gotLocation(gps_loc);
+				return;
+			}
+
+			if (net_loc != null) {
+				mLocationResult.gotLocation(net_loc);
+				return;
+			}
+			mLocationResult.gotLocation(null);
+		}
+	}
+
+	public static abstract class LocationResult{
+		public abstract void gotLocation(Location location);
+	}
+}

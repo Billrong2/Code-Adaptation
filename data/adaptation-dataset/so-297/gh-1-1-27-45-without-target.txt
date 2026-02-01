@@ -1,0 +1,53 @@
+package com.dexafree.materialList.listeners;
+
+import android.content.Context;
+import android.support.annotation.NonNull;
+import android.support.v7.widget.RecyclerView;
+import android.view.GestureDetector;
+import android.view.MotionEvent;
+
+import com.dexafree.materialList.card.Card;
+import com.dexafree.materialList.card.CardLayout;
+
+
+
+public class RecyclerItemClickListener implements RecyclerView.OnItemTouchListener {
+
+    private RecyclerView mRecyclerView;
+
+    public interface OnItemClickListener {
+        void onItemClick(@NonNull final Card card, int position);
+
+        void onItemLongClick(@NonNull final Card card, int position);
+    }
+
+    private OnItemClickListener mListener;
+    private GestureDetector mGestureDetector;
+
+    // TODO
+
+
+    @Override
+    public boolean onInterceptTouchEvent(RecyclerView view, MotionEvent e) {
+        CardLayout childView = (CardLayout) view.findChildViewUnder(e.getX(), e.getY());
+
+        if (childView != null && mListener != null && mGestureDetector.onTouchEvent(e)) {
+            mListener.onItemClick(childView.getCard(), view.getChildPosition(childView));
+        }
+
+        return false;
+    }
+
+    @Override
+    public void onTouchEvent(RecyclerView view, MotionEvent motionEvent) {
+    }
+
+    public void setRecyclerView(RecyclerView recyclerView) {
+        mRecyclerView = recyclerView;
+    }
+
+    @Override
+    public void onRequestDisallowInterceptTouchEvent(boolean b) {
+
+    }
+}

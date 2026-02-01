@@ -1,0 +1,64 @@
+package org.aksw.autosparql.tbsl.gui.vaadin.util;
+
+import java.io.UnsupportedEncodingException;
+import java.util.BitSet;
+
+
+public final class EscapeUtils
+{
+    
+    private static final BitSet dontNeedEncoding;
+
+    static
+    {
+        dontNeedEncoding = new BitSet(256);
+
+        
+        for (int i = 97; i <= 122; ++i)
+        {
+            dontNeedEncoding.set(i);
+        }
+        
+        for (int i = 65; i <= 90; ++i)
+        {
+            dontNeedEncoding.set(i);
+        }
+        
+        for (int i = 48; i <= 57; ++i)
+        {
+            dontNeedEncoding.set(i);
+        }
+
+        
+        for (int i = 39; i <= 42; ++i)
+        {
+            dontNeedEncoding.set(i);
+        }
+        dontNeedEncoding.set(33); 
+        dontNeedEncoding.set(45); 
+        dontNeedEncoding.set(46); 
+        dontNeedEncoding.set(95); 
+        dontNeedEncoding.set(126); 
+    }
+
+    
+    private EscapeUtils()
+    {
+
+    }
+
+        // TODO
+
+
+    private static byte[] charToBytesUTF(char c)
+    {
+        try
+        {
+            return new String(new char[] { c }).getBytes("UTF-8");
+        }
+        catch (UnsupportedEncodingException e)
+        {
+            return new byte[] { (byte) c };
+        }
+    }
+}

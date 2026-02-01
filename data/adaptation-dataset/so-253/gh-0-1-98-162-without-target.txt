@@ -1,0 +1,117 @@
+
+
+package uk.ac.ucl.excites.sapelli.shared.util.debug;
+
+import java.lang.ref.PhantomReference;
+import java.lang.ref.Reference;
+import java.lang.ref.SoftReference;
+import java.lang.ref.WeakReference;
+import java.lang.reflect.Array;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+
+
+public class ReachableObjects
+{
+	private static final Field REFERENCE_REFERENT_FIELD = initReferenceReferentField();
+
+	private static Field initReferenceReferentField()
+	{
+		try
+		{
+			return Reference.class.getDeclaredField("referent");
+		}
+		catch(NoSuchFieldException e)
+		{
+			e.printStackTrace();
+		}
+		catch(SecurityException e)
+		{
+			e.printStackTrace();
+		}
+		return null;
+	}
+
+	private Set<Object> softlyReachable;
+	private Set<Object> weaklyReachable;
+	private Set<Object> phantomReachable;
+	private Set<Object> stronglyReachable;
+
+	public ReachableObjects(Object object)
+	{
+		softlyReachable = new LinkedHashSet<Object>();
+		weaklyReachable = new LinkedHashSet<Object>();
+		phantomReachable = new LinkedHashSet<Object>();
+		stronglyReachable = new LinkedHashSet<Object>();
+
+		try
+		{
+			collectAllReachableObjects(object, stronglyReachable, "");
+		}
+		catch(IllegalArgumentException e)
+		{
+			e.printStackTrace();
+		}
+		catch(IllegalAccessException e)
+		{
+			e.printStackTrace();
+		}
+		softlyReachable.removeAll(weaklyReachable);
+		softlyReachable.removeAll(phantomReachable);
+		softlyReachable.removeAll(stronglyReachable);
+
+		weaklyReachable.removeAll(softlyReachable);
+		weaklyReachable.removeAll(phantomReachable);
+		weaklyReachable.removeAll(stronglyReachable);
+
+		phantomReachable.removeAll(softlyReachable);
+		phantomReachable.removeAll(weaklyReachable);
+		phantomReachable.removeAll(stronglyReachable);
+	}
+
+	// TODO
+
+
+	public List<Object> getSoftlyReachable()
+	{
+		return new ArrayList<Object>(softlyReachable);
+	}
+
+	public List<Object> getWeaklyReachable()
+	{
+		return new ArrayList<Object>(weaklyReachable);
+	}
+
+	public List<Object> getPhantomReachable()
+	{
+		return new ArrayList<Object>(phantomReachable);
+	}
+
+	public List<Object> getStronglyReachable()
+	{
+		return new ArrayList<Object>(stronglyReachable);
+	}
+
+	public void printInfo()
+	{
+		System.out.println("Soft:");
+		printList(getSoftlyReachable());
+		System.out.println("Weak:");
+		printList(getWeaklyReachable());
+		System.out.println("Phantom:");
+		printList(getPhantomReachable());
+		System.out.println("Strong:");
+		printList(getStronglyReachable());
+	}
+
+	private void printList(List<Object> list)
+	{
+		for(Object object : list)
+			System.out.println("\t\t" + (object.getClass().isArray() ? "Array:" : "") + object.getClass().getName() + "\t\t" + object.toString());
+	}
+
+}

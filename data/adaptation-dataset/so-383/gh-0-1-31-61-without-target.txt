@@ -1,0 +1,29 @@
+package com.afollestad.materialdialogs.prefs;
+
+import android.content.Context;
+import android.content.DialogInterface;
+import android.os.Bundle;
+import android.preference.ListPreference;
+import android.util.AttributeSet;
+import android.view.View;
+
+import com.afollestad.materialdialogs.MaterialDialog;
+
+
+public class MaterialListPreference extends ListPreference {
+
+    private Context context;
+
+    public MaterialListPreference(Context context) {
+        super(context);
+        this.context = context;
+    }
+
+    public MaterialListPreference(Context context, AttributeSet attrs) {
+        super(context, attrs);
+        this.context = context;
+    }
+
+    // TODO
+
+}

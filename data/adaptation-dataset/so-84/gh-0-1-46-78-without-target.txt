@@ -1,0 +1,55 @@
+package systems.byteswap.aiproute;
+
+import android.util.Log;
+
+import java.io.ByteArrayOutputStream;
+import java.io.Closeable;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.DatagramSocket;
+import java.net.Socket;
+
+
+
+public class ShellAccess {
+    public static String readFully(InputStream is) throws IOException {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        byte[] buffer = new byte[4096];
+        int length;
+        while ((length = is.read(buffer)) != -1) {
+            baos.write(buffer, 0, length);
+        }
+        return baos.toString("UTF-8");
+    }
+
+        // TODO
+
+}
+
+class Closer {
+    private static final String AIPROUTE_SHELL = "MyActivity";
+    public static void closeSilently(Object... xs) {
+        
+        for (Object x : xs) {
+            if (x != null) {
+                try {
+
+                    Log.d(AIPROUTE_SHELL, "closing: " + x);
+                    if (x instanceof Closeable) {
+                        ((Closeable)x).close();
+                    } else if (x instanceof Socket) {
+                        ((Socket)x).close();
+                    } else if (x instanceof DatagramSocket) {
+                        ((DatagramSocket)x).close();
+                    } else {
+                        Log.d(AIPROUTE_SHELL,"cannot close: "+x);
+                        throw new RuntimeException("cannot close "+x);
+                    }
+                } catch (Throwable e) {
+                    Log.e(AIPROUTE_SHELL,e.toString());
+                }
+            }
+        }
+    }
+}

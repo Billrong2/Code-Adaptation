@@ -1,0 +1,13 @@
+package sagex.miniclient.android.util;
+
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.util.Collections;
+import java.util.List;
+
+
+public class NetUtil {
+    // TODO
+
+
+}

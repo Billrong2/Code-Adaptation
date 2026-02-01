@@ -1,0 +1,31 @@
+package com.kixeye.chassis.support.util;
+
+
+
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.SocketException;
+import java.util.Enumeration;
+
+import com.netflix.config.ConfigurationManager;
+
+
+public final class NetworkingUtils {
+
+	private NetworkingUtils() {}
+	
+	    // TODO
+
+
+    
+    public static String getApplicationIdentifier() {
+        
+        String id = ConfigurationManager.getConfigInstance().getString("aws.instance.id",null);
+
+        
+        if (id == null) {
+            id = getIpAddress();
+        }
+        return id.replace('.', '_');
+    }
+}

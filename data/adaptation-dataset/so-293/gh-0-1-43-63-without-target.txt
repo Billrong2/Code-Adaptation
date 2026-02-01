@@ -1,0 +1,51 @@
+package org.odk.collect.android.utilities;
+
+import android.util.Log;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.CalendarView;
+
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+
+
+
+public class DateWidgetUtils {
+
+    public static void fixCalendarViewIfJellyBean(CalendarView calendarView) {
+        try {
+            Object object = calendarView;
+            Field[] fields = object.getClass().getDeclaredFields();
+            for (Field field : fields) {
+                if (field.getName().equals("mDelegate")) { 
+                    field.setAccessible(true);
+                    object = field.get(object);
+                    break;
+                }
+            }
+
+            Field field = object.getClass().getDeclaredField("mDateTextSize"); 
+            field.setAccessible(true);
+            final int mDateTextSize = (Integer) field.get(object);
+
+            field = object.getClass().getDeclaredField("mListView"); 
+            field.setAccessible(true);
+            Object innerObject = field.get(object);
+
+            Method method = innerObject.getClass().getMethod(
+                    "setOnHierarchyChangeListener", ViewGroup.OnHierarchyChangeListener.class); 
+            method.setAccessible(true);
+            method.invoke(innerObject, (Object) new ViewGroup.OnHierarchyChangeListener() {
+                // TODO
+
+
+                @Override
+                public void onChildViewRemoved(View parent, View child) {
+                }
+            });
+        } catch (Exception e) {
+            Log.e("DateTimeWidget", e.getMessage(), e);
+        }
+    }
+
+}

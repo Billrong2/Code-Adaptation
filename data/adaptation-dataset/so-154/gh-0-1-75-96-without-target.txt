@@ -1,0 +1,44 @@
+
+package com.linecorp.armeria.server.logging;
+
+import static com.google.common.base.Preconditions.checkArgument;
+
+import java.util.BitSet;
+import java.util.Random;
+
+
+final class CountingSampler extends Sampler {
+    private final BitSet sampleDecisions;
+    private int counter; 
+
+    
+    private CountingSampler(float rate) {
+        int outOf100 = (int) (rate * 100.0f);
+        sampleDecisions = randomBitSet(100, outOf100, new Random());
+    }
+
+    
+    public static Sampler create(final float rate) {
+        if (rate == 0) {
+            return NEVER_SAMPLE;
+        }
+        if (rate == 1.0) {
+            return ALWAYS_SAMPLE;
+        }
+        checkArgument(rate >= 0.01f && rate < 1, "rate should be between 0.01 and 1: was %s", rate);
+        return new CountingSampler(rate);
+    }
+
+        // TODO
+
+
+    
+    @Override
+    public synchronized boolean isSampled() {
+        boolean result = sampleDecisions.get(counter++);
+        if (counter == 100) {
+            counter = 0;
+        }
+        return result;
+    }
+}
