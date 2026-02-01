@@ -14,7 +14,7 @@ From this directory:
 
 ### 0) Configure the LLM client (Azure OpenAI)
 
-`util.llm_gpt5()` reads Azure OpenAI config from env vars:
+`util.llm_gpt4o()` reads Azure OpenAI config from env vars:
 
 ```bash
 export AZURE_OPENAI_ENDPOINT="https://<your-resource>.openai.azure.com/"
