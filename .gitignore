@@ -6,3 +6,15 @@ docker-compose.yml
 github_repos_by_commit/
 github_repos_current/
 
+<<<<<<< HEAD
+=======
+# Python caches
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+
+# Local env files
+.venv/
+.env
+>>>>>>> 5acd36c (init)
