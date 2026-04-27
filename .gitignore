@@ -6,8 +6,6 @@ docker-compose.yml
 github_repos_by_commit/
 github_repos_current/
 
-<<<<<<< HEAD
-=======
 # Python caches
 __pycache__/
 **/__pycache__/
@@ -17,4 +15,15 @@ __pycache__/
 # Local env files
 .venv/
 .env
->>>>>>> 5acd36c (init)
+
+# Private / rebuttal / local-only artifacts
+Keys
+Rebuttal/
+PDF.pdf
+*.pdf
+
+# Local packages and data bundles
+*.tar
+*.tar.gz
+*.tgz
+*.zip
