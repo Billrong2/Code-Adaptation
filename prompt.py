@@ -23,13 +23,35 @@ In your patch, do not delete any code that is currently existing in the code bas
 """
 
 user_prompt_gpt_naive = """
-You are a coding assistant.
-Here is a snippet from our GitHub repository: 
+You are a coding assistant. This is a single-prompt Chain-of-Thought baseline.
+You receive all available artifacts in one prompt: the adaptation taxonomy,
+the generated intent summary, the mined context summary, the GitHub code,
+and the Stack Overflow code. Use these artifacts directly in one response;
+do not decompose the task into multiple agents or iterative refinement rounds.
+
+Adaptation taxonomy:
+<ADAPTATION_TAXONOMY>
+
+Intent summary:
+<INTENT_SUMMARY>
+
+Mined context summary:
+<MINED_CONTEXT_SUMMARY>
+
+GitHub/codebase artifact:
 <REPO_CODE_SNIPPET>
-And here is the code snippet from Stack Overflow: 
+
+Stack Overflow artifact:
 <SO_CODE_SNIPPET>
-Please add the Stack Overflow feature into our existing snippet.
-I only need the final patch—do not provide the entire GitHub file, just show the unified diff or patch.
+
+Task:
+Adapt the Stack Overflow behavior into the GitHub code. Reason step by step
+about the intent, taxonomy-relevant adaptation issues, mined context, API
+differences, variable/type differences, required imports, and integration points
+before producing the answer.
+
+Return only the final unified diff or patch. Do not include the full GitHub file.
+Do not include the reasoning trace in the final answer.
 """
 
 ## this is a specific example, only tuned for test_labeled_2

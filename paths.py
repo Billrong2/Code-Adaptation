@@ -4,11 +4,7 @@ import os
 ROOT = Path(__file__).resolve().parent
 
 # Results root (override with env var if needed)
-<<<<<<< HEAD
-RESULTS_ROOT = Path(os.getenv("FSE_RESULTS_ROOT", str(ROOT / "results")))
-=======
 RESULTS_ROOT = Path(os.getenv("CODE_ADAPT_RESULTS_ROOT", str(ROOT / "results")))
->>>>>>> 5acd36c (init)
 
 # Current (preferred) results layout
 ADAPTATION_DIR = RESULTS_ROOT / "adaptation"

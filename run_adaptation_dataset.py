@@ -10,12 +10,18 @@ import javalang
 from tqdm import tqdm
 
 import adapt_agent
+from prompt import user_prompt_gpt_naive
 
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_INPUT = ROOT / "data" / "adaptations_with_snapshots_with_intent.json"
 DEFAULT_OUTPUT = ROOT / "data" / "adaptations_with_snapshots_with_intent_and_results.json"
 DEFAULT_DATASET_ROOT = ROOT / "data" / "adaptation-dataset"
+COT_ONLY_SYSTEM_PROMPT = (
+    "You are a senior code adaptation engineer. Follow the user's single-prompt "
+    "Chain-of-Thought baseline instructions. Use only the artifacts provided in "
+    "that prompt, and return only the requested final patch."
+)
 
 
 class LoggingLLM(adapt_agent.LLMClient):
@@ -49,6 +55,8 @@ def _write_json(path: Path, data: list[dict]) -> None:
 def _index_dataset_folders(dataset_root: Path) -> dict[str, Path]:
     mapping: dict[str, Path] = {}
     duplicates = set()
+    if not dataset_root.exists():
+        return mapping
     for folder in dataset_root.iterdir():
         if not folder.is_dir() or not folder.name.startswith("so-"):
             continue
@@ -121,8 +129,156 @@ def _syntax_check(source: str) -> tuple[bool, str]:
         return False, f"javalang parse error: {exc}"
 
 
+def _join_list(values: list) -> str:
+    return ", ".join(str(v) for v in values)
+
+
+def _format_stored_file_context(file_context) -> str:
+    """Render stored file_context without running any new context-mining step."""
+    if not file_context:
+        return "none"
+    if not isinstance(file_context, dict):
+        return str(file_context)
+
+    lines = []
+    ordered_keys = [
+        "package",
+        "classes",
+        "imports",
+        "custom_api_imports",
+        "direct_callers",
+        "direct_callees",
+        "related_methods",
+        "call_pairs",
+        "caller_callee_map",
+        "context_fields",
+        "context_field_types",
+        "max_hops",
+    ]
+    for key in ordered_keys:
+        if key not in file_context:
+            continue
+        value = file_context.get(key)
+        if value in (None, "", [], {}):
+            continue
+        if isinstance(value, list):
+            lines.append(f"{key}: {_join_list(value)}")
+        elif isinstance(value, dict):
+            lines.append(f"{key}: {json.dumps(value, ensure_ascii=True, sort_keys=True)}")
+        else:
+            lines.append(f"{key}: {value}")
+
+    extra = {
+        k: v
+        for k, v in file_context.items()
+        if k not in ordered_keys and v not in (None, "", [], {})
+    }
+    if extra:
+        lines.append(f"extra_context: {json.dumps(extra, ensure_ascii=True, sort_keys=True)}")
+    return "\n".join(lines) if lines else "none"
+
+
+def _build_cot_only_prompt(record: dict, taxonomy: str) -> str:
+    repo_code = (
+        record.get("file_level_code_without_target")
+        or record.get("file_level_code")
+        or record.get("gh_snippet")
+        or ""
+    )
+    prompt = user_prompt_gpt_naive
+    prompt = prompt.replace("<ADAPTATION_TAXONOMY>", taxonomy)
+    prompt = prompt.replace("<INTENT_SUMMARY>", record.get("adaptation_intent") or "none")
+    prompt = prompt.replace(
+        "<MINED_CONTEXT_SUMMARY>",
+        _format_stored_file_context(record.get("file_context")),
+    )
+    prompt = prompt.replace("<REPO_CODE_SNIPPET>", repo_code)
+    prompt = prompt.replace("<SO_CODE_SNIPPET>", record.get("so_snippet") or "")
+    return prompt
+
+
+def _missing_cot_only_inputs(record: dict) -> list[str]:
+    missing = []
+    if not record.get("so_snippet"):
+        missing.append("so_snippet")
+    if not (
+        record.get("file_level_code_without_target")
+        or record.get("file_level_code")
+        or record.get("gh_snippet")
+    ):
+        missing.append("github_code")
+    if not record.get("adaptation_intent"):
+        missing.append("adaptation_intent")
+    return missing
+
+
+def _run_cot_only(
+    data: list[dict],
+    args: argparse.Namespace,
+    llm_client: LoggingLLM,
+) -> tuple[int, int]:
+    taxonomy = adapt_agent.PolicyAgent().build_checklist()
+    processed = 0
+    updated = 0
+    skipped_existing = 0
+    skipped_missing = 0
+
+    for idx, record in tqdm(list(enumerate(data)), total=len(data), desc="cot-only", unit="items"):
+        if idx < args.start:
+            continue
+        if args.limit and processed >= args.limit:
+            break
+
+        if record.get("cot_only_response_raw") and not args.force:
+            skipped_existing += 1
+            processed += 1
+            continue
+
+        missing = _missing_cot_only_inputs(record)
+        if missing:
+            record["cot_only_status"] = "skipped"
+            record["cot_only_failure_reason"] = "missing_inputs: " + ", ".join(missing)
+            skipped_missing += 1
+            processed += 1
+            continue
+
+        prompt = _build_cot_only_prompt(record, taxonomy)
+        record["cot_only_prompt_kind"] = "single_prompt_cot_all_artifacts"
+        record["cot_only_status"] = "running"
+        record["cot_only_failure_reason"] = None
+        try:
+            raw = llm_client.complete(COT_ONLY_SYSTEM_PROMPT, prompt)
+            record["cot_only_status"] = "success"
+            record["cot_only_failure_reason"] = None
+            record["cot_only_response_raw"] = raw
+            record["cot_only_patch"] = raw
+            updated += 1
+        except Exception as exc:
+            record["cot_only_status"] = "failed"
+            record["cot_only_failure_reason"] = f"{type(exc).__name__}: {exc}"
+
+        processed += 1
+        if args.save_every and processed % args.save_every == 0:
+            _write_json(args.output, data)
+            print(f"Saved {processed} / {len(data)} (updated {updated})")
+        if args.sleep:
+            time.sleep(args.sleep)
+
+    print(
+        f"CoT-only summary: updated={updated}, "
+        f"skipped_existing={skipped_existing}, skipped_missing={skipped_missing}"
+    )
+    return processed, updated
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run adapt agent on adaptation dataset.")
+    parser.add_argument(
+        "--variant",
+        choices=("adaptagent", "cot-only"),
+        default="adaptagent",
+        help="Generation variant to run with this dataset runner.",
+    )
     parser.add_argument("--input", type=Path, default=DEFAULT_INPUT, help="Input JSON dataset.")
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT, help="Output JSON dataset.")
     parser.add_argument(
@@ -141,9 +297,15 @@ def main() -> None:
     args = parser.parse_args()
 
     data = _load_json(args.input)
-    folder_map = _index_dataset_folders(args.dataset_root)
-
     llm_client = LoggingLLM()
+
+    if args.variant == "cot-only":
+        processed, updated = _run_cot_only(data, args, llm_client)
+        _write_json(args.output, data)
+        print(f"Done. Variant cot-only. Processed {processed}, updated {updated}, total {len(data)}")
+        return
+
+    folder_map = _index_dataset_folders(args.dataset_root)
     verifier = adapt_agent.Verifier() if args.verify else None
     pipeline = adapt_agent.AdaptAgentPipeline(llm_client, verifier=verifier)
 

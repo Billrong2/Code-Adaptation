@@ -11,7 +11,9 @@ import javalang
 import requests
 
 from joern_runner import JoernRunner
-def llm_gpt5(
+
+
+def llm_gpt4o(
     user_prompt: str,
     system_prompt: str = "",
     top_p: float = 1.0,
@@ -23,7 +25,7 @@ def llm_gpt5(
     azure_endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT")
     api_key = os.environ.get("AZURE_OPENAI_API_KEY")
     api_version = os.environ.get("AZURE_OPENAI_API_VERSION", "2024-12-01-preview")
-    deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT", "gpt-5.2-chat-2")
+    deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
 
     if not azure_endpoint or not api_key:
         raise RuntimeError(
@@ -49,6 +51,8 @@ def llm_gpt5(
     )
     print(response.choices[0].message.content)
     return response.choices[0].message.content
+
+
 class Joern:
     def __init__(self, joern_path):
         self._runner = JoernRunner(Path(joern_path))
@@ -719,7 +723,7 @@ def search_for_SO_Post_with_SO_ID(ID):
             removed_code_base = ''.join(removed_code_base[:int(start_line)-1] + removed_code_base[int(end_line):])
             return SO_Code, code_base, craved_code, removed_code_base
 def llmgpt(system_prompt, user_prompt):
-    return llm_gpt5(user_prompt=user_prompt, system_prompt=system_prompt)
+    return llm_gpt4o(user_prompt=user_prompt, system_prompt=system_prompt)
 if __name__ == "__main__":
 
     access_token = os.getenv("")

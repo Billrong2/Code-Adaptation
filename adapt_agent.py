@@ -42,7 +42,7 @@ class LLMClient:
         self.max_retries = max_retries
 
     def complete(self, system_prompt: str, user_prompt: str) -> str:
-        return util.llm_gpt5(system_prompt=system_prompt, user_prompt=user_prompt)
+        return util.llm_gpt4o(system_prompt=system_prompt, user_prompt=user_prompt)
 
     def complete_json(self, system_prompt: str, user_prompt: str) -> dict:
         last_err: Optional[Exception] = None

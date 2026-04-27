@@ -38,7 +38,21 @@ Per-record artifacts are written under `data/adaptation-dataset/so-*/`, includin
 - `adapt_agent_result_<gh_id>.java` (generated function-only output)
 - `adapt_agent_response_<gh_id>.json` (raw model response in JSON form)
 
-### 2) Run evaluation
+### 2) Run the single-prompt CoT baseline (optional)
+
+This baseline reads artifacts already stored in the marked JSON and sends one prompt per record.
+It does not run the AdaptAgent summarizer, planner, context miner, verifier, or refinement loop.
+
+```bash
+python3 run_adaptation_dataset.py \
+  --variant cot-only \
+  --input data/adaptations_with_snapshots_with_intent_and_results_marked.json \
+  --output data/adaptations_with_snapshots_with_intent_and_results_marked.json
+```
+
+Outputs are written back as `cot_only_*` fields, including `cot_only_response_raw` and `cot_only_patch`.
+
+### 3) Run evaluation
 
 ```bash
 python3 eval.py --dataset data/adaptations_with_snapshots_with_intent_and_results_marked.json
